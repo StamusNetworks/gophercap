@@ -1,0 +1,16 @@
+build-binary:
+  image: golang:1.15-buster
+  stage: build
+  artifacts:
+    expire_in: 1 day
+    paths:
+      - ./gopherCap.gz
+  script:
+    - apt-get update && apt-get install -y libpcap-dev
+    - go get -u ./
+    - go build -o ./gopherCap ./
+    - ./gopherCap --help
+  after_script:
+    - gzip gopherCap
+  rules:
+    - if: '$CI_BUILD_TAG =~ /^build-.*/'
