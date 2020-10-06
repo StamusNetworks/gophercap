@@ -4,11 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"gopherCap/pkg/fs"
+	"gopherCap/pkg/models"
 	"io/ioutil"
 	"os"
 	"sort"
-	"gopherCap/pkg/fs"
-	"gopherCap/pkg/models"
 	"sync"
 
 	"github.com/sirupsen/logrus"
@@ -99,7 +99,7 @@ func concurrentScanPeriods(
 	}
 
 	var wg sync.WaitGroup
-	rx := make(chan fs.Pcap, workers)
+	rx := make(chan fs.Pcap, 0)
 	tx := make(chan fs.Pcap, 0)
 
 	for i := 0; i < workers; i++ {

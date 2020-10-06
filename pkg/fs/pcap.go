@@ -2,9 +2,9 @@ package fs
 
 import (
 	"context"
+	"gopherCap/pkg/models"
 	"io"
 	"os"
-	"gopherCap/pkg/models"
 	"time"
 
 	"github.com/google/gopacket/pcapgo"
@@ -59,10 +59,7 @@ func (p Pcap) Do(w WorkerFunc) error {
 		return err
 	}
 	defer h.Close()
-	if err := w(h); err != nil {
-		return err
-	}
-	return nil
+	return w(h)
 }
 
 /*
@@ -81,12 +78,13 @@ func (p *Pcap) ScanPeriod(ctx context.Context) error {
 			return err
 		}
 		p.Period.Beginning = ci.Timestamp
+		p.Counters.Size = len(data)
 
 		var last time.Time
 
 		// No scan, need to iterate over entire file
 		for {
-			_, ci, err := h.ReadPacketData()
+			data, ci, err = h.ReadPacketData()
 
 			if err != nil && err == io.EOF {
 				break
@@ -105,14 +103,9 @@ func (p *Pcap) ScanPeriod(ctx context.Context) error {
 		p.Snaplen = h.Snaplen()
 
 		return nil
-
 	}
 
-	if err := p.Do(fn); err != nil {
-		return err
-	}
-
-	return nil
+	return p.Do(fn)
 }
 
 func (p Pcap) open() (io.ReadCloser, error) { return Open(p.Path) }
