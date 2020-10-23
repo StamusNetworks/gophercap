@@ -8,19 +8,28 @@ It can also calculate metadata for PCAP files and extract files from compressed 
 
 # Background
 
-Stamus Networks develops  [Scirius Security Platform](https://www.stamus-networks.com/scirius-platform) and open-source [Scirius CE](https://github.com/StamusNetworks/scirius). We specialize in IDS rule management, threat hunting, and data analytics. All centered around [Suricata](https://github.com/OISF/suricata) network IDS. Our development and QA pipeline is therefore *data-driven*, which is just a fancy way of saying *we rely on replaying PCAPs over and over again*.
+Stamus Networks develops [Scirius Security Platform](https://www.stamus-networks.com/scirius-platform) and open-source [Scirius CE](https://github.com/StamusNetworks/scirius), network security platforms. We specialize in  network detection and response solutions which include signature ruleset management, network threat hunting, advanced threat intelligence and data analytics. All leveraging the  Suricata network IDS/IPS/NSM engine.
 
-Normally we would use [tcpreplay](https://tcpreplay.appneta.com/) with predetermined PPS options. But this flattens the packet rate for entire PCAP file, and in process loses important temporal information needed for developing algorithmic threat detection. 
+Historically, we have used [tcpreplay](https://tcpreplay.appneta.com/) with predetermined PPS options. When setting up replay for a particular bigger-than-average PCAP set, we initially tried the typical bash rocket approach. Just read PCAP metadata using capinfos, extract average packet rate and then replay the file at that extracted average rate. Not ideal for developing algorithmic threat detection, but the result should be close enough, right?
 
-Furthermore, a particular larger-than-average dataset posed an interesting problem where PCAPs were written in parallel using [moloch](https://github.com/aol/moloch). Each worker wrote to a separate file and thus also rotated them independently. Flow processing 101 - all packets in a flow need to pass a single worker and flow balancing is always a best effort. And *elephant flows* happen. That resulted in dataset that could not be replayed sequentially as the actual file periods were all out of sync. And guess what, thread ID was not part of PCAP file naming scheme...
+```bash
+avg_pps=$(capinfos ${pcap} | grep 'Average packet rate' | awk '{print $4}' | tr -d ',')
+tcpreplay-edit --pps=$avg_pps --mtu-trunc -i $iface ${pcap}
+```
 
-Of course we could just do `-r` and parse PCAPs post-mortem. NSM tools even support reading an entire folder and maintain flows between files. Solves the problem, right? 
+After four days, our replay had only gone through about 10-15% of all PCAP files. Given that entire dataset only spans for three days, we were understandably puzzled. Sure, we were aware that replaying with average rate would flatten out all bursts, but that still seemed too much. But we quickly figured out what happened.
 
-Well, not really. This post-mortem read functionality has never really worked well with large out of sync PCAPs. Often the process simply runs for excessive amount of time while using a lot of memory. Maintaining all those flow tables, not sure when to time out, can really take it's toll. And it really struggles when files are not sequential. And to make matters worse, all events are in past with new parse iterations just being thrown into the same elastic pile as the old. Not ideal for continuous QA and dev work. This got us thinking.
+That set was written using [Moloch](https://github.com/aol/moloch) full packet capture. Like Suricata, it reconstructs sessions from the ground up. All the way to the application layer. And like Suricata, it’s multi-threaded. Flow reconstruction 101 - all packets in a flow need to pass through the same worker. No information exchange happens between workers due to the extreme throughput they need to handle, and each worker can write those packets out to a separate PCAP file. But not all flows are created equal. Some workers will see more traffic volume than others, even if the flow balancer is able to distribute roughly the same number of sessions to each thread. One thread would therefore receive a large HTTP file download while another gets a lot of small DNS queries. The first PCAP file will simply rotate faster.
+
+In other words, our script relied on having sequential PCAP files. But the dataset was not sequential at all. Rather, it consisted of N sequential PCAP subsets, where N corresponds to the number of workers configured in Moloch. All in one folder and without worker ID configured as part of the PCAP naming scheme. Not knowing how many workers were used. And we needed to reconstruct it as well as we could, as the dataset was full of sweet simulated attacks, perfect for exercising the algorithmic threat detection we are developing. To put it bluntly, it sucked to be us.
+
+But... 
 
 We can check when a PCAP file begins and ends by simply parsing the first and last packet. [Gopacket](https://github.com/google/gopacket) is pretty cool. It works well, we have have good experience using it. Even better, golang is actually built from ground up for concurrency, and spinning up IO readers that produce to single IO writer via thread-safe channel is a breeze. So, why not just sleep each reader for a duration calculated between global dataset and PCAP start timestamps. We can easily calculate diffs between each packet with `time.Sub()`, and sleep before pushing to writer. [Gopacket even had an example on that (albeit too basic to outright solve our problem)](https://github.com/google/gopacket/blob/master/examples/pcaplay/main.go). And finally, we could implement this feature as subcommand to bigger binary and build our own swiss army knife for all kinds of funky PCAP operations.
 
 Two working days later, we had a prototype replay tool. And after a month of bugfixes and usage in lab we decided to give it to community.
+
+You can read more in [this Stamus Networks blog post](https://www.stamus-networks.com/blog/gophercap), detailing the design more thoroughly.
 
 # Getting started
 
