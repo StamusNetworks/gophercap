@@ -57,6 +57,26 @@ func (s *Set) updateDelayValues() *Set {
 }
 
 /*
+FilterFilesWithErrs creates a new set listing and removes all files that were not parsed correctly.
+*/
+func (s *Set) FilterFilesWithErrs() (int, error) {
+	files := make([]Pcap, 0)
+	var count int
+	for _, f := range s.Files {
+		if f.Err == nil {
+			files = append(files, f)
+		} else {
+			count++
+		}
+	}
+	if len(files) == 0 {
+		return 0, errors.New("No pcap files were parsed successfully")
+	}
+	s.updateFiles(files)
+	return count, nil
+}
+
+/*
 FilterFilesByRegex subsets pcap Set by applying regexp pattern on file names.
 */
 func (s *Set) FilterFilesByRegex(pattern *regexp.Regexp) error {

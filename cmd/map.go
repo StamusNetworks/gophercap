@@ -62,8 +62,17 @@ gopherCap map \
 		}
 
 		for _, f := range set.Files {
-			logrus.Infof("%s ||| %s -> %s ||| %d packets ||| %d bytes",
-				f.Path, f.Period.Beginning, f.Period.End, f.Counters.Packets, f.Counters.Size)
+			if f.Err != nil {
+				logrus.Errorf("%s encountered error: %s", f.Path, f.Err)
+			} else {
+				logrus.Infof("%s -> %s ||| %d packets ||| %d bytes ||| %s",
+					f.Period.Beginning, f.Period.End, f.Counters.Packets, f.Counters.Size, f.Path)
+			}
+		}
+		if removed, err := set.FilterFilesWithErrs(); err != nil {
+			logrus.Fatal(err)
+		} else if removed > 0 {
+			logrus.Warnf("Unable to map %d files, removing from final dump.", removed)
 		}
 		logrus.Infof("Dumping %d pcap file info between %s and %s to %s.",
 			len(set.Files), set.Beginning, set.End, viper.GetString("dump.json"))
