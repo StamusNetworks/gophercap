@@ -2,6 +2,7 @@ package replay
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"regexp"
 	"sync"
@@ -20,9 +21,13 @@ type Config struct {
 	Set            pcapset.Set
 	WriteInterface string
 	FilterRegex    *regexp.Regexp
-	SpeedModifier  float64
 	OutBpf         string
 	DisableWait    bool
+
+	SpeedModifier float64
+	ScaleDuration time.Duration
+	ScaleEnabled  bool
+	ScalePerFile  bool
 
 	TimeFrom, TimeTo time.Time
 }
@@ -38,6 +43,9 @@ func (c Config) Validate() error {
 	if c.SpeedModifier < 0 {
 		return fmt.Errorf("Invalid speed modifier %.2f - should be positive value", c.SpeedModifier)
 	}
+	if c.ScaleEnabled && c.ScaleDuration == 0 {
+		return errors.New("Time scaling enabled but duration not defined")
+	}
 	return nil
 }
 
@@ -47,8 +55,12 @@ Handle is the core object managing replay state
 type Handle struct {
 	FileSet pcapset.Set
 
-	speedMod float64
-	iface    string
+	speedMod      float64
+	scaleEnabled  bool
+	scalePerFile  bool
+	scaleDuration time.Duration
+
+	iface string
 
 	disableWait bool
 
@@ -70,19 +82,17 @@ func NewHandle(c Config) (*Handle, error) {
 		return nil, err
 	}
 	h := &Handle{
-		FileSet:     c.Set,
-		wg:          &sync.WaitGroup{},
-		packets:     make(chan []byte, len(c.Set.Files)),
-		errs:        make(chan error, len(c.Set.Files)),
-		iface:       c.WriteInterface,
-		outBpf:      c.OutBpf,
-		disableWait: c.DisableWait,
-		speedMod: func() float64 {
-			if c.SpeedModifier > 0 {
-				return c.SpeedModifier
-			}
-			return 1.0
-		}(),
+		FileSet:       c.Set,
+		wg:            &sync.WaitGroup{},
+		packets:       make(chan []byte, len(c.Set.Files)),
+		errs:          make(chan error, len(c.Set.Files)),
+		iface:         c.WriteInterface,
+		outBpf:        c.OutBpf,
+		disableWait:   c.DisableWait,
+		speedMod:      c.SpeedModifier,
+		scaleEnabled:  c.ScaleEnabled,
+		scalePerFile:  c.ScalePerFile,
+		scaleDuration: c.ScaleDuration,
 	}
 	if c.FilterRegex != nil {
 		logrus.Info("Filtering pcap files")
@@ -104,7 +114,24 @@ func NewHandle(c Config) (*Handle, error) {
 	}
 	for _, p := range h.FileSet.Files {
 		h.wg.Add(1)
-		go replayReadWorker(h.wg, p, h.packets, h.errs, h.speedMod, h.disableWait)
+		go replayReadWorker(
+			h.wg,
+			p,
+			h.packets,
+			h.errs,
+			func() float64 {
+				if h.scaleEnabled {
+					return calculateSpeedModifier(func() time.Duration {
+						if h.scalePerFile {
+							return p.Period.Duration()
+						}
+						return h.FileSet.Period.Duration()
+					}(), h.scaleDuration)
+				}
+				return h.speedMod
+			}(),
+			h.disableWait,
+		)
 	}
 	go func() {
 		h.wg.Wait()
@@ -151,4 +178,14 @@ loop:
 // Errors is used to extract async worker exit issues
 func (h Handle) Errors() <-chan error {
 	return h.errs
+}
+
+func calculateSpeedModifier(period, scale time.Duration) float64 {
+	logrus.Debugf(
+		"Period %.2fm scale %.2fm diff multiplier %.2f",
+		period.Minutes(),
+		scale.Minutes(),
+		float64(period)/float64(scale),
+	)
+	return float64(period) / float64(scale)
 }

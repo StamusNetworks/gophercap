@@ -96,6 +96,9 @@ FATA[0005] send: Message too long
 			handle, err := replay.NewHandle(replay.Config{
 				Set:            *set,
 				WriteInterface: viper.GetString("out.interface"),
+				ScaleDuration:  viper.GetDuration("time.scale.duration"),
+				ScaleEnabled:   viper.GetBool("time.scale.enabled"),
+				ScalePerFile:   viper.GetBool("time.scale.perfile"),
 				FilterRegex: func() *regexp.Regexp {
 					if pattern := viper.GetString("file.regexp"); pattern != "" {
 						re, err := regexp.Compile(pattern)
@@ -207,6 +210,11 @@ func init() {
 			`Overrides time.modifier value. Actual replay is not guaranteed to complete in defined time, `+
 			`As overhead from sleep calculations causes a natural drift.`)
 	viper.BindPFlag("time.scale.enabled", replayCmd.PersistentFlags().Lookup("time-scale-enabled"))
+
+	replayCmd.PersistentFlags().Bool("time-scale-perfile", false,
+		`Timescale each PCAP file separately. `+
+			`Useful together with --wait-disable when generating traffic from multiple separate files into common period.`)
+	viper.BindPFlag("time.scale.perfile", replayCmd.PersistentFlags().Lookup("time-scale-perfile"))
 
 	replayCmd.PersistentFlags().Bool("wait-disable", false,
 		`Disable initial wait before each PCAP file read. `+
