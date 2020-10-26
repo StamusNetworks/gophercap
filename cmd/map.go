@@ -37,18 +37,26 @@ gopherCap map \
 	--dump-json /mnt/pcap/meta.json
 `,
 	Run: func(cmd *cobra.Command, args []string) {
-		files, err := fs.NewPcapList(viper.GetString("dir.src"), viper.GetString("file.suffix"))
+		files, err := fs.NewPcapList(
+			viper.GetString("dir.src"),
+			viper.GetString("file.suffix"),
+		)
 		if err != nil {
 			logrus.Fatal(err)
 		}
 
-		set, err := pcapset.NewPcapSetFromList(files, func() int {
-			if workers := viper.GetInt("file.workers"); workers > 0 {
-				logrus.Infof("Using %d workers for mapping", workers)
-				return workers
-			}
-			return len(files)
-		}())
+		set, err := pcapset.NewPcapSetFromList(
+			files,
+			func() int {
+				if workers := viper.GetInt("file.workers"); workers > 0 {
+					logrus.Infof("Using %d workers for mapping", workers)
+					return workers
+				}
+				return len(files)
+			}(),
+			viper.GetString("file.regexp"),
+		)
+
 		if err != nil {
 			logrus.Fatal(err)
 		}

@@ -4,10 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"gopherCap/pkg/fs"
 	"gopherCap/pkg/models"
 	"io/ioutil"
 	"os"
+	"regexp"
 	"sort"
 	"sync"
 
@@ -18,9 +20,19 @@ import (
 NewPcapSetFromList instantiates a new Set object from a list of Pcaps from filesystem module.
 Used for initial metadata scan.
 */
-func NewPcapSetFromList(rx []fs.Pcap, workers int) (*Set, error) {
+func NewPcapSetFromList(rx []fs.Pcap, workers int, filePattern string) (*Set, error) {
 	if rx == nil || len(rx) == 0 {
 		return nil, errors.New("Missing pcap list or empty")
+	}
+	var (
+		fileRegexp *regexp.Regexp
+		err        error
+	)
+	if filePattern != "" {
+		fileRegexp, err = regexp.Compile(filePattern)
+		if err != nil {
+			return nil, fmt.Errorf("Invalid file regexp: %s", err)
+		}
 	}
 	ch, err := concurrentScanPeriods(context.TODO(), rx, workers)
 	if err != nil {
@@ -29,7 +41,9 @@ func NewPcapSetFromList(rx []fs.Pcap, workers int) (*Set, error) {
 	s := &Set{Files: make([]Pcap, 0)}
 	for f := range ch {
 		f.Calculate()
-		s.Files = append(s.Files, Pcap{Pcap: f})
+		if fileRegexp == nil || fileRegexp.MatchString(f.Path) {
+			s.Files = append(s.Files, Pcap{Pcap: f})
+		}
 	}
 	sort.SliceStable(s.Files, func(i, j int) bool {
 		return s.Files[i].Beginning.Before(s.Files[j].Beginning)
