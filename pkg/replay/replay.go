@@ -126,7 +126,7 @@ func NewHandle(c Config) (*Handle, error) {
 							return p.Period.Duration()
 						}
 						return h.FileSet.Period.Duration()
-					}(), h.scaleDuration)
+					}(), h.scaleDuration, h.scalePerFile)
 				}
 				return h.speedMod
 			}(),
@@ -180,12 +180,11 @@ func (h Handle) Errors() <-chan error {
 	return h.errs
 }
 
-func calculateSpeedModifier(period, scale time.Duration) float64 {
-	logrus.Debugf(
-		"Period %.2fm scale %.2fm diff multiplier %.2f",
-		period.Minutes(),
-		scale.Minutes(),
-		float64(period)/float64(scale),
-	)
+func calculateSpeedModifier(period, scale time.Duration, scalePerFile bool) float64 {
+	if scalePerFile {
+		logrus.Debugf(
+			"Period %s scale %s diff multiplier %.2f", period, scale, float64(period)/float64(scale),
+		)
+	}
 	return float64(period) / float64(scale)
 }
