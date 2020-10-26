@@ -138,7 +138,8 @@ FATA[0005] send: Message too long
 					}
 					return time.Time{}
 				}(),
-				OutBpf: viper.GetString("out.bpf"),
+				OutBpf:      viper.GetString("out.bpf"),
+				DisableWait: viper.GetBool("wait.disable"),
 			})
 			if err != nil {
 				logrus.Fatal(err)
@@ -206,4 +207,9 @@ func init() {
 			`Overrides time.modifier value. Actual replay is not guaranteed to complete in defined time, `+
 			`As overhead from sleep calculations causes a natural drift.`)
 	viper.BindPFlag("time.scale.enabled", replayCmd.PersistentFlags().Lookup("time-scale-enabled"))
+
+	replayCmd.PersistentFlags().Bool("wait-disable", false,
+		`Disable initial wait before each PCAP file read. `+
+			`Useful when PCAPs are part of same logical set but not from same capture period.`)
+	viper.BindPFlag("wait.disable", replayCmd.PersistentFlags().Lookup("wait-disable"))
 }

@@ -1,8 +1,8 @@
 package replay
 
 import (
-	"io"
 	"gopherCap/pkg/pcapset"
+	"io"
 	"sync"
 	"time"
 
@@ -19,6 +19,7 @@ func replayReadWorker(
 	tx chan<- []byte,
 	errs chan<- error,
 	modifier float64,
+	disableWait bool,
 ) {
 	defer wg.Done()
 	fnLoopWithSleep := func(reader *pcapgo.Reader, last time.Time) error {
@@ -47,7 +48,7 @@ func replayReadWorker(
 			return err
 		}
 
-		if pcapfile.Delay > 0 {
+		if !disableWait && pcapfile.Delay > 0 {
 			logrus.Infof("file %s start is future, will wait for %s",
 				pcapfile.Path, pcapfile.Delay)
 			dur := float64(pcapfile.Delay) / modifier

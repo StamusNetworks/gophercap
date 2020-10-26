@@ -22,6 +22,7 @@ type Config struct {
 	FilterRegex    *regexp.Regexp
 	SpeedModifier  float64
 	OutBpf         string
+	DisableWait    bool
 
 	TimeFrom, TimeTo time.Time
 }
@@ -49,6 +50,8 @@ type Handle struct {
 	speedMod float64
 	iface    string
 
+	disableWait bool
+
 	packets chan []byte
 	errs    chan error
 
@@ -67,12 +70,13 @@ func NewHandle(c Config) (*Handle, error) {
 		return nil, err
 	}
 	h := &Handle{
-		FileSet: c.Set,
-		wg:      &sync.WaitGroup{},
-		packets: make(chan []byte, len(c.Set.Files)),
-		errs:    make(chan error, len(c.Set.Files)),
-		iface:   c.WriteInterface,
-		outBpf:  c.OutBpf,
+		FileSet:     c.Set,
+		wg:          &sync.WaitGroup{},
+		packets:     make(chan []byte, len(c.Set.Files)),
+		errs:        make(chan error, len(c.Set.Files)),
+		iface:       c.WriteInterface,
+		outBpf:      c.OutBpf,
+		disableWait: c.DisableWait,
 		speedMod: func() float64 {
 			if c.SpeedModifier > 0 {
 				return c.SpeedModifier
@@ -100,7 +104,7 @@ func NewHandle(c Config) (*Handle, error) {
 	}
 	for _, p := range h.FileSet.Files {
 		h.wg.Add(1)
-		go replayReadWorker(h.wg, p, h.packets, h.errs, h.speedMod)
+		go replayReadWorker(h.wg, p, h.packets, h.errs, h.speedMod, h.disableWait)
 	}
 	go func() {
 		h.wg.Wait()
