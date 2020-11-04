@@ -34,16 +34,14 @@ func NewPcapSetFromList(rx []fs.Pcap, workers int, filePattern string) (*Set, er
 			return nil, fmt.Errorf("Invalid file regexp: %s", err)
 		}
 	}
-	ch, err := concurrentScanPeriods(context.TODO(), rx, workers)
+	ch, err := concurrentScanPeriods(context.TODO(), rx, workers, fileRegexp)
 	if err != nil {
 		return nil, err
 	}
 	s := &Set{Files: make([]Pcap, 0)}
 	for f := range ch {
 		f.Calculate()
-		if fileRegexp == nil || fileRegexp.MatchString(f.Path) {
-			s.Files = append(s.Files, Pcap{Pcap: f})
-		}
+		s.Files = append(s.Files, Pcap{Pcap: f})
 	}
 	sort.SliceStable(s.Files, func(i, j int) bool {
 		return s.Files[i].Beginning.Before(s.Files[j].Beginning)
@@ -104,6 +102,7 @@ func concurrentScanPeriods(
 	ctx context.Context,
 	files []fs.Pcap,
 	workers int,
+	pattern *regexp.Regexp,
 ) (<-chan fs.Pcap, error) {
 	if files == nil || len(files) == 0 {
 		return nil, errors.New("No pcap files")
@@ -133,7 +132,11 @@ func concurrentScanPeriods(
 	}
 
 	go func() {
+	loop:
 		for i, pcapfile := range files {
+			if pattern != nil && !pattern.MatchString(pcapfile.Path) {
+				continue loop
+			}
 			logrus.Debugf("Feeding %s %d/%d", pcapfile.Path, i, len(files))
 			rx <- pcapfile
 		}
