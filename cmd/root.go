@@ -74,13 +74,13 @@ func init() {
 
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.go-replay.yaml)")
 
-	rootCmd.PersistentFlags().String("dump-json", "db/mapped-files.json",
+	rootCmd.PersistentFlags().String("dump-json", "/tmp/mapped-files.json",
 		`Full or relative path for storing pcap metadata in JSON format.`)
-	viper.BindPFlag("dump.json", rootCmd.PersistentFlags().Lookup("dump-json"))
+	viper.BindPFlag("global.dump.json", rootCmd.PersistentFlags().Lookup("dump-json"))
 
 	rootCmd.PersistentFlags().String("file-regexp", "",
 		`Regex pattern to filter files.`)
-	viper.BindPFlag("file.regexp", rootCmd.PersistentFlags().Lookup("file-regexp"))
+	viper.BindPFlag("global.file.regexp", rootCmd.PersistentFlags().Lookup("file-regexp"))
 }
 
 // initConfig reads in config file and ENV variables if set.

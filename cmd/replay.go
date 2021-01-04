@@ -74,19 +74,19 @@ Increase interface MTU if you get this error:
 FATA[0005] send: Message too long
 `,
 	Run: func(cmd *cobra.Command, args []string) {
-		set, err := pcapset.LoadSetJSON(viper.GetString("dump.json"))
+		set, err := pcapset.LoadSetJSON(viper.GetString("global.dump.json"))
 		if err != nil {
 			logrus.Fatal(err)
 		}
-		iterations := viper.GetInt("loop.count")
-		if iterations < 1 || viper.GetBool("loop.infinite") {
+		iterations := viper.GetInt("replay.loop.count")
+		if iterations < 1 || viper.GetBool("replay.loop.infinite") {
 			logrus.Infof("Negative iteration count or --loop-infinite called. Enabling infinite loop.")
 		}
 		var count int
 	loop:
 		for {
 			count++
-			if !viper.GetBool("loop.infinite") && count > iterations {
+			if !viper.GetBool("replay.loop.infinite") && count > iterations {
 				if iterations > 1 {
 					logrus.Infof("Max iteration count %d reached. Stopping loop.", iterations)
 				}
@@ -95,12 +95,12 @@ FATA[0005] send: Message too long
 			logrus.Infof("Starting iteration %d", count)
 			handle, err := replay.NewHandle(replay.Config{
 				Set:            *set,
-				WriteInterface: viper.GetString("out.interface"),
-				ScaleDuration:  viper.GetDuration("time.scale.duration"),
-				ScaleEnabled:   viper.GetBool("time.scale.enabled"),
-				ScalePerFile:   viper.GetBool("time.scale.perfile"),
+				WriteInterface: viper.GetString("replay.out.interface"),
+				ScaleDuration:  viper.GetDuration("replay.time.scale.duration"),
+				ScaleEnabled:   viper.GetBool("replay.time.scale.enabled"),
+				ScalePerFile:   viper.GetBool("replay.time.scale.perfile"),
 				FilterRegex: func() *regexp.Regexp {
-					if pattern := viper.GetString("file.regexp"); pattern != "" {
+					if pattern := viper.GetString("global.file.regexp"); pattern != "" {
 						re, err := regexp.Compile(pattern)
 						if err != nil {
 							logrus.Fatal(err)
@@ -110,17 +110,17 @@ FATA[0005] send: Message too long
 					return nil
 				}(),
 				SpeedModifier: func() float64 {
-					if viper.GetBool("time.scale.enabled") {
-						dur := viper.GetDuration("time.scale.duration")
+					if viper.GetBool("replay.time.scale.enabled") {
+						dur := viper.GetDuration("replay.time.scale.duration")
 						mod := float64(set.Duration()) / float64(dur)
 						logrus.Infof("Timescaling enabled with duration %s. Set duration is %s. Using modifier %.2f",
 							dur, set.Duration(), mod)
 						return mod
 					}
-					return viper.GetFloat64("time.modifier")
+					return viper.GetFloat64("replay.time.modifier")
 				}(),
 				TimeFrom: func() time.Time {
-					if from := viper.GetString("time.from"); from != "" {
+					if from := viper.GetString("replay.time.from"); from != "" {
 						ts, err := time.Parse(argTsFormat, from)
 						if err != nil {
 							logrus.Fatalf("Invalid timestamp %s, please follow this format: %s",
@@ -131,7 +131,7 @@ FATA[0005] send: Message too long
 					return time.Time{}
 				}(),
 				TimeTo: func() time.Time {
-					if from := viper.GetString("time.to"); from != "" {
+					if from := viper.GetString("replay.time.to"); from != "" {
 						ts, err := time.Parse(argTsFormat, from)
 						if err != nil {
 							logrus.Fatalf("Invalid timestamp %s, please follow this format: %s",
@@ -141,8 +141,8 @@ FATA[0005] send: Message too long
 					}
 					return time.Time{}
 				}(),
-				OutBpf:      viper.GetString("out.bpf"),
-				DisableWait: viper.GetBool("wait.disable"),
+				OutBpf:      viper.GetString("replay.out.bpf"),
+				DisableWait: viper.GetBool("replay.disable_wait"),
 			})
 			if err != nil {
 				logrus.Fatal(err)
@@ -174,50 +174,50 @@ func init() {
 
 	replayCmd.PersistentFlags().String("out-interface", "eth0",
 		`Network interface to replay to.`)
-	viper.BindPFlag("out.interface", replayCmd.PersistentFlags().Lookup("out-interface"))
+	viper.BindPFlag("replay.out.interface", replayCmd.PersistentFlags().Lookup("out-interface"))
 
 	replayCmd.PersistentFlags().String("out-bpf", "",
 		`BPF filter to exclude some packets.`)
-	viper.BindPFlag("out.bpf", replayCmd.PersistentFlags().Lookup("out-bpf"))
+	viper.BindPFlag("replay.out.bpf", replayCmd.PersistentFlags().Lookup("out-bpf"))
 
 	replayCmd.PersistentFlags().Bool("loop-infinite", false,
 		`Loop over pcap files infinitely. Will override --loop-count`)
-	viper.BindPFlag("loop.infinite", replayCmd.PersistentFlags().Lookup("loop-infinite"))
+	viper.BindPFlag("replay.loop.infinite", replayCmd.PersistentFlags().Lookup("loop-infinite"))
 
 	replayCmd.PersistentFlags().Int("loop-count", 1,
 		`Number of iterations over pcap set. Will run infinitely if 0 or negative value is given.`)
-	viper.BindPFlag("loop.count", replayCmd.PersistentFlags().Lookup("loop-count"))
+	viper.BindPFlag("replay.loop.count", replayCmd.PersistentFlags().Lookup("loop-count"))
 
-	replayCmd.PersistentFlags().Float64("time-modifier", 1.0,
+	replayCmd.PersistentFlags().Float64("time-modifier", 1,
 		`Modifier for speeding up or slowing down the replay by a factor of X.`)
-	viper.BindPFlag("time.modifier", replayCmd.PersistentFlags().Lookup("time-modifier"))
-
-	replayCmd.PersistentFlags().Duration("time-scale-duration", 1*time.Hour,
-		`Duration for time scaling.`)
-	viper.BindPFlag("time.scale.duration", replayCmd.PersistentFlags().Lookup("time-scale-duration"))
+	viper.BindPFlag("replay.time.modifier", replayCmd.PersistentFlags().Lookup("time-modifier"))
 
 	replayCmd.Flags().String(
 		"time-from", "", `Start replay from this time.`)
-	viper.BindPFlag("time.from", replayCmd.Flags().Lookup("time-from"))
+	viper.BindPFlag("replay.time.from", replayCmd.Flags().Lookup("time-from"))
 
 	replayCmd.Flags().String(
 		"time-to", "", `End replay from this time.`)
-	viper.BindPFlag("time.to", replayCmd.Flags().Lookup("time-to"))
+	viper.BindPFlag("replay.time.to", replayCmd.Flags().Lookup("time-to"))
 
 	replayCmd.PersistentFlags().Bool("time-scale-enabled", false,
 		`Enable time scaling. `+
-			`When enabled, will automatically calculate time.modifier value to replay pcap in specified time window. `+
-			`Overrides time.modifier value. Actual replay is not guaranteed to complete in defined time, `+
+			`When enabled, will automatically calculate replay.time.modifier value to replay pcap in specified time window. `+
+			`Overrides replay.time.modifier value. Actual replay is not guaranteed to complete in defined time, `+
 			`As overhead from sleep calculations causes a natural drift.`)
-	viper.BindPFlag("time.scale.enabled", replayCmd.PersistentFlags().Lookup("time-scale-enabled"))
+	viper.BindPFlag("replay.time.scale.enabled", replayCmd.PersistentFlags().Lookup("time-scale-enabled"))
+
+	replayCmd.PersistentFlags().Duration("time-scale-duration", 1*time.Hour,
+		`Duration for time scaling.`)
+	viper.BindPFlag("replay.time.scale.duration", replayCmd.PersistentFlags().Lookup("time-scale-duration"))
 
 	replayCmd.PersistentFlags().Bool("time-scale-perfile", false,
 		`Timescale each PCAP file separately. `+
 			`Useful together with --wait-disable when generating traffic from multiple separate files into common period.`)
-	viper.BindPFlag("time.scale.perfile", replayCmd.PersistentFlags().Lookup("time-scale-perfile"))
+	viper.BindPFlag("replay.time.scale.perfile", replayCmd.PersistentFlags().Lookup("time-scale-perfile"))
 
 	replayCmd.PersistentFlags().Bool("wait-disable", false,
 		`Disable initial wait before each PCAP file read. `+
 			`Useful when PCAPs are part of same logical set but not from same capture period.`)
-	viper.BindPFlag("wait.disable", replayCmd.PersistentFlags().Lookup("wait-disable"))
+	viper.BindPFlag("replay.disable_wait", replayCmd.PersistentFlags().Lookup("wait-disable"))
 }

@@ -19,11 +19,11 @@ import (
 	"archive/tar"
 	"compress/gzip"
 	"fmt"
+	"gopherCap/pkg/fs"
 	"io"
 	"os"
 	"path/filepath"
 	"regexp"
-	"gopherCap/pkg/fs"
 	"strings"
 
 	"github.com/sirupsen/logrus"
@@ -51,14 +51,14 @@ gopherCap tarExtract \
 	--dryrun
 `,
 	Run: func(cmd *cobra.Command, args []string) {
-		fileReader, err := fs.Open(viper.GetString("in.tarball"))
+		fileReader, err := fs.Open(viper.GetString("tarball.in.file"))
 		if err != nil {
 			logrus.Fatalf("Tarball read: %s", err)
 		}
 		defer fileReader.Close()
 		reader := tar.NewReader(fileReader)
 		pattern := func() *regexp.Regexp {
-			if pattern := viper.GetString("file.regexp"); pattern != "" {
+			if pattern := viper.GetString("global.file.regexp"); pattern != "" {
 				re, err := regexp.Compile(pattern)
 				if err != nil {
 					logrus.Fatal(err)
@@ -67,11 +67,11 @@ gopherCap tarExtract \
 			}
 			return nil
 		}()
-		outDir := viper.GetString("out.dir")
-		if outDir == "" && !viper.GetBool("dryrun") {
+		outDir := viper.GetString("tarball.out.dir")
+		if outDir == "" && !viper.GetBool("tarball.dryrun") {
 			logrus.Fatal("Missing output dir.")
 		}
-		logrus.Infof("Starting reater for %s.", viper.GetString("in.tarball"))
+		logrus.Infof("Starting reater for %s.", viper.GetString("tarball.in.tarball"))
 	loop:
 		for {
 			header, err := reader.Next()
@@ -93,7 +93,7 @@ gopherCap tarExtract \
 				outfile := filepath.Join(
 					outDir, strings.ReplaceAll(strings.TrimPrefix(info.Name(), "./"), "/", "-"),
 				)
-				if viper.GetBool("out.gzip") {
+				if viper.GetBool("tarball.out.gzip") {
 					outfile = fmt.Sprintf("%s.gz", outfile)
 				}
 				file, err := os.OpenFile(outfile, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, info.Mode())
@@ -101,7 +101,7 @@ gopherCap tarExtract \
 					logrus.Fatal(err)
 				}
 				var writer io.WriteCloser = file
-				if viper.GetBool("out.gzip") {
+				if viper.GetBool("tarball.out.gzip") {
 					writer = gzip.NewWriter(file)
 				}
 				_, err = io.Copy(writer, reader)
@@ -119,17 +119,17 @@ func init() {
 
 	tarExtractCmd.PersistentFlags().String("in-tarball", "",
 		`Input gzipped tarball.`)
-	viper.BindPFlag("in.tarball", tarExtractCmd.PersistentFlags().Lookup("in-tarball"))
+	viper.BindPFlag("tarball.in.file", tarExtractCmd.PersistentFlags().Lookup("in-tarball"))
 
 	tarExtractCmd.PersistentFlags().String("out-dir", "",
 		`Output directory for pcap files.`)
-	viper.BindPFlag("out.dir", tarExtractCmd.PersistentFlags().Lookup("out-dir"))
+	viper.BindPFlag("tarball.out.dir", tarExtractCmd.PersistentFlags().Lookup("out-dir"))
 
 	tarExtractCmd.PersistentFlags().Bool("dryrun", false,
 		`Only list files in tarball for regex validation, do not extract.`)
-	viper.BindPFlag("dryrun", tarExtractCmd.PersistentFlags().Lookup("dryrun"))
+	viper.BindPFlag("tarball.dryrun", tarExtractCmd.PersistentFlags().Lookup("dryrun"))
 
 	tarExtractCmd.PersistentFlags().Bool("out-gzip", false,
 		`Compress extracted files with gzip.`)
-	viper.BindPFlag("out.gzip", tarExtractCmd.PersistentFlags().Lookup("out-gzip"))
+	viper.BindPFlag("tarball.out.gzip", tarExtractCmd.PersistentFlags().Lookup("out-gzip"))
 }

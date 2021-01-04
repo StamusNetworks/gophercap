@@ -38,8 +38,8 @@ gopherCap map \
 `,
 	Run: func(cmd *cobra.Command, args []string) {
 		files, err := fs.NewPcapList(
-			viper.GetString("dir.src"),
-			viper.GetString("file.suffix"),
+			viper.GetString("map.dir.src"),
+			viper.GetString("map.file.suffix"),
 		)
 		if err != nil {
 			logrus.Fatal(err)
@@ -48,13 +48,13 @@ gopherCap map \
 		set, err := pcapset.NewPcapSetFromList(
 			files,
 			func() int {
-				if workers := viper.GetInt("file.workers"); workers > 0 {
+				if workers := viper.GetInt("map.file.workers"); workers > 0 {
 					logrus.Infof("Using %d workers for mapping", workers)
 					return workers
 				}
 				return len(files)
 			}(),
-			viper.GetString("file.regexp"),
+			viper.GetString("global.file.regexp"),
 		)
 
 		if err != nil {
@@ -75,9 +75,9 @@ gopherCap map \
 			logrus.Warnf("Unable to map %d files, removing from final dump.", removed)
 		}
 		logrus.Infof("Dumping %d pcap file info between %s and %s to %s.",
-			len(set.Files), set.Beginning, set.End, viper.GetString("dump.json"))
+			len(set.Files), set.Beginning, set.End, viper.GetString("global.dump.json"))
 
-		if err := pcapset.DumpSetJSON(viper.GetString("dump.json"), *set); err != nil {
+		if err := pcapset.DumpSetJSON(viper.GetString("global.dump.json"), *set); err != nil {
 			logrus.Fatal(err)
 		}
 	},
@@ -88,14 +88,14 @@ func init() {
 
 	mapCmd.PersistentFlags().String("dir-src", "",
 		`Source folder for recursive pcap search.`)
-	viper.BindPFlag("dir.src", mapCmd.PersistentFlags().Lookup("dir-src"))
+	viper.BindPFlag("map.dir.src", mapCmd.PersistentFlags().Lookup("dir-src"))
 
-	mapCmd.PersistentFlags().String("file-suffix", "pcap.gz",
+	mapCmd.PersistentFlags().String("file-suffix", "pcap",
 		`Suffix suffix used for file discovery.`)
-	viper.BindPFlag("file.suffix", mapCmd.PersistentFlags().Lookup("file-suffix"))
+	viper.BindPFlag("map.file.suffix", mapCmd.PersistentFlags().Lookup("file-suffix"))
 
 	mapCmd.PersistentFlags().Int("file-workers", 4,
 		`Number of concurrent workers for scanning pcap files. `+
 			`Value less than 1 will map all pcap files concurrently.`)
-	viper.BindPFlag("file.workers", mapCmd.PersistentFlags().Lookup("file-workers"))
+	viper.BindPFlag("map.file.workers", mapCmd.PersistentFlags().Lookup("file-workers"))
 }
