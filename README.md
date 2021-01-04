@@ -212,7 +212,7 @@ Flags:
       --time-from string               Start replay from this time.
       --time-modifier float            Modifier for speeding up or slowing down the replay by a factor of X. (default 1)
       --time-scale-duration duration   Duration for time scaling. (default 1h0m0s)
-      --time-scale-enabled             Enable time scaling. When enabled, will automatically calculate time.modifier value to replay pcap in specified time window. Overrides time.modifier value. Actual replay is not guaranteed to complete in defined time, As overhead from sleep calculations causes a natural drift.
+      --time-scale-enabled             Enable time scaling. When enabled, will automatically calculate replay.time.modifier value to replay pcap in specified time window. Overrides replay.time.modifier value. Actual replay is not guaranteed to complete in defined time, As overhead from sleep calculations causes a natural drift.
       --time-to string                 End replay from this time.
 
 Global Flags:
