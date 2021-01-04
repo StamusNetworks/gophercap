@@ -1,0 +1,34 @@
+global:
+  dump:
+    json: /tmp/mapped-files.json
+  file:
+    regexp: ""
+map:
+  dir:
+    src: ""
+  file:
+    suffix: pcap
+    workers: 4
+replay:
+  disable_wait: false
+  loop:
+    count: 1
+    infinite: false
+  out:
+    bpf: ""
+    interface: eth0
+  time:
+    from: ""
+    modifier: "1"
+    scale:
+      duration: 1h0m0s
+      enabled: false
+      perfile: false
+    to: ""
+tarball:
+  dryrun: false
+  in:
+    file: ""
+  out:
+    dir: ""
+    gzip: false
