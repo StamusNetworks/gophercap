@@ -23,7 +23,6 @@ replay:
     scale:
       duration: 1h0m0s
       enabled: false
-      perfile: false
     to: ""
 tarball:
   dryrun: false

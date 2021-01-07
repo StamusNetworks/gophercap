@@ -98,7 +98,9 @@ FATA[0005] send: Message too long
 				WriteInterface: viper.GetString("replay.out.interface"),
 				ScaleDuration:  viper.GetDuration("replay.time.scale.duration"),
 				ScaleEnabled:   viper.GetBool("replay.time.scale.enabled"),
-				ScalePerFile:   viper.GetBool("replay.time.scale.perfile"),
+				ScalePerFile:   viper.GetBool("replay.disable_wait"),
+				OutBpf:         viper.GetString("replay.out.bpf"),
+				DisableWait:    viper.GetBool("replay.disable_wait"),
 				FilterRegex: func() *regexp.Regexp {
 					if pattern := viper.GetString("global.file.regexp"); pattern != "" {
 						re, err := regexp.Compile(pattern)
@@ -113,8 +115,10 @@ FATA[0005] send: Message too long
 					if viper.GetBool("replay.time.scale.enabled") {
 						dur := viper.GetDuration("replay.time.scale.duration")
 						mod := float64(set.Duration()) / float64(dur)
-						logrus.Infof("Timescaling enabled with duration %s. Set duration is %s. Using modifier %.2f",
-							dur, set.Duration(), mod)
+						logrus.Infof(
+							"Timescaling enabled with duration %s. Set duration is %s. Using modifier %.2f",
+							dur, set.Duration(), mod,
+						)
 						return mod
 					}
 					return viper.GetFloat64("replay.time.modifier")
@@ -123,8 +127,7 @@ FATA[0005] send: Message too long
 					if from := viper.GetString("replay.time.from"); from != "" {
 						ts, err := time.Parse(argTsFormat, from)
 						if err != nil {
-							logrus.Fatalf("Invalid timestamp %s, please follow this format: %s",
-								from, argTsFormat)
+							logrus.Fatalf("Invalid timestamp %s, please follow this format: %s", from, argTsFormat)
 						}
 						return ts.UTC()
 					}
@@ -134,15 +137,12 @@ FATA[0005] send: Message too long
 					if from := viper.GetString("replay.time.to"); from != "" {
 						ts, err := time.Parse(argTsFormat, from)
 						if err != nil {
-							logrus.Fatalf("Invalid timestamp %s, please follow this format: %s",
-								from, argTsFormat)
+							logrus.Fatalf("Invalid timestamp %s, please follow this format: %s", from, argTsFormat)
 						}
 						return ts.UTC()
 					}
 					return time.Time{}
 				}(),
-				OutBpf:      viper.GetString("replay.out.bpf"),
-				DisableWait: viper.GetBool("replay.disable_wait"),
 			})
 			if err != nil {
 				logrus.Fatal(err)
@@ -210,11 +210,6 @@ func init() {
 	replayCmd.PersistentFlags().Duration("time-scale-duration", 1*time.Hour,
 		`Duration for time scaling.`)
 	viper.BindPFlag("replay.time.scale.duration", replayCmd.PersistentFlags().Lookup("time-scale-duration"))
-
-	replayCmd.PersistentFlags().Bool("time-scale-perfile", false,
-		`Timescale each PCAP file separately. `+
-			`Useful together with --wait-disable when generating traffic from multiple separate files into common period.`)
-	viper.BindPFlag("replay.time.scale.perfile", replayCmd.PersistentFlags().Lookup("time-scale-perfile"))
 
 	replayCmd.PersistentFlags().Bool("wait-disable", false,
 		`Disable initial wait before each PCAP file read. `+
