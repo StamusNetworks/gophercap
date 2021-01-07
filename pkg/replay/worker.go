@@ -49,8 +49,11 @@ func replayReadWorker(
 		}
 
 		if !disableWait && pcapfile.Delay > 0 {
-			logrus.Infof("file %s start is future, will wait for %s",
-				pcapfile.Path, pcapfile.Delay)
+			logrus.Infof(
+				"file %s start is future, will wait for %s",
+				pcapfile.Path,
+				time.Duration(int64(float64(pcapfile.Delay)/modifier)),
+			)
 			dur := float64(pcapfile.Delay) / modifier
 			time.Sleep(time.Duration(dur))
 		}
