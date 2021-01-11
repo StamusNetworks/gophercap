@@ -9,8 +9,8 @@ build-binary-buster:
     - ./build/ci/build_debian.sh
   after_script:
     - gzip gopherCap
-  rules:
-    - if: '$CI_BUILD_TAG =~ /^build-.*/'
+  only:
+    - tags
 
 build-binary-ubuntu-2004:
   image: ubuntu:20.04
@@ -23,5 +23,5 @@ build-binary-ubuntu-2004:
     - ./build/ci/build_debian.sh
   after_script:
     - gzip gopherCap
-  rules:
-    - if: '$CI_BUILD_TAG =~ /^build-.*/'
+  only:
+    - tags
