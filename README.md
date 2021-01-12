@@ -69,7 +69,7 @@ cd gophercap
 makepkg -si
 ```
 
-## Build and basic usage
+## Build
 
 Building GopherCap is quite easy, assuming some familiarity with Go build system. Currently it only has one Cgo dependency - libpcap. GoperCap needs libpcap to write packets into network interface. Development headers must be present for installing and regular library must be installed for execution.
 
@@ -110,7 +110,7 @@ Binary can then be executed directly.
 gopherCap --help
 ```
 
-## Testing replay
+## Basic usage
 
 Each subcommand has embedded usage examples. Refer to those for up to date and more extensive information.
 
