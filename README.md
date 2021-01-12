@@ -205,6 +205,16 @@ docker run -ti --rm --network host -v /mnt/pcap:/pcaps stamus/gophercap replay \
   --out-interface veth0
 ```
 
+## YAML config
+
+All CLI flags can be defined as configuration dictionary in YAML file. See [example configuration](/config/gophercap.yml) for layout. We also provide a subcommand for generating a clean template with default values. However, note that `--config` global flag needs to be used.
+
+```
+gopherCap --config <YAML file> <subcommand>
+```
+
+Configuration dictionary is organized by subcommand. With options used by multiple subcommands under `global` section. For example, location of mapping JSON file must be synced between `map` and `replay` commands, and thus both use the same config option. However, your mileage might vary with other parameters. You might want to map all PCAP files, but only replay a subset. In that case, you need two configuration files, or you need to override `global.file.regexp` via CLI flag.
+
 # Subcommands
 
 GoperCap uses *cobra* and *viper* libraries to implement a single binary with many subcommands. Similar to many other tools built in Go. Here's overview of currently supported features.
@@ -219,13 +229,13 @@ Usage:
 
 Flags:
       --dir-src string       Source folder for recursive pcap search.
-      --file-suffix string   Suffix suffix used for file discovery. (default "pcap.gz")
+      --file-suffix string   Suffix suffix used for file discovery. (default "pcap")
       --file-workers int     Number of concurrent workers for scanning pcap files. Value less than 1 will map all pcap files concurrently. (default 4)
   -h, --help                 help for map
 
 Global Flags:
       --config string        config file (default is $HOME/.go-replay.yaml)
-      --dump-json string     Full or relative path for storing pcap metadata in JSON format. (default "db/mapped-files.json")
+      --dump-json string     Full or relative path for storing pcap metadata in JSON format. (default "/tmp/mapped-files.json")
       --file-regexp string   Regex pattern to filter files.
 ```
 
@@ -250,10 +260,11 @@ Flags:
       --time-scale-duration duration   Duration for time scaling. (default 1h0m0s)
       --time-scale-enabled             Enable time scaling. When enabled, will automatically calculate replay.time.modifier value to replay pcap in specified time window. Overrides replay.time.modifier value. Actual replay is not guaranteed to complete in defined time, As overhead from sleep calculations causes a natural drift.
       --time-to string                 End replay from this time.
+      --wait-disable                   Disable initial wait before each PCAP file read. Useful when PCAPs are part of same logical set but not from same capture period.
 
 Global Flags:
       --config string        config file (default is $HOME/.go-replay.yaml)
-      --dump-json string     Full or relative path for storing pcap metadata in JSON format. (default "db/mapped-files.json")
+      --dump-json string     Full or relative path for storing pcap metadata in JSON format. (default "/tmp/mapped-files.json")
       --file-regexp string   Regex pattern to filter files.
 ```
 
@@ -276,8 +287,31 @@ Flags:
 
 Global Flags:
       --config string        config file (default is $HOME/.go-replay.yaml)
-      --dump-json string     Full or relative path for storing pcap metadata in JSON format. (default "db/mapped-files.json")
+      --dump-json string     Full or relative path for storing pcap metadata in JSON format. (default "/tmp/mapped-files.json")
       --file-regexp string   Regex pattern to filter files.
+```
+
+## Example config
+
+GopherCap uses viper library to build a configuration dictionary. In other words, all CLI flags can be defined in YAML config file. CLI arguments would simply override the config file settings.
+
+```
+gopherCap --config ./config.yml exampleConfig
+```
+
+## Version
+
+Prints GopherCap version tag. For integrating with CI builds and automated deploy systems, to check if local binary needs to be updated. Default value is `development`.
+
+```
+gopherCap version
+```
+
+Custom version can be embedded with following build command.
+
+```
+export VERSION=<val>
+go build -ldflags="-X 'gopherCap/cmd.Version=$VERSION'" -o ./gopherCap ./
 ```
 
 # Contributing
