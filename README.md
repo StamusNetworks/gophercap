@@ -33,9 +33,45 @@ You can read more in [this Stamus Networks blog post](https://www.stamus-network
 
 # Getting started
 
+## Binary packages
+
+Version tagged binaries for GopherCap can be found under **releases** section in github. We currently provide Ubuntu 20.04 and Debian Buster CI builds. Note that very little is different between the builds. We simply separated them to ensure that libpcap version is locked in per platform. Following bash commands can be used to pull latest version download url.
+
+### Ubuntu
+
+```
+GOPHER_URL=$(curl --silent "https://api.github.com/repos/StamusNetworks/gophercap/releases/latest" | jq -r '.assets[] | select(.name|startswith("gopherCap-ubuntu-2004-")) | .browser_download_url')
+wget $GOPHER_URL
+```
+
+### Debian
+
+```
+GOPHER_URL=$(curl --silent "https://api.github.com/repos/StamusNetworks/gophercap/releases/latest" | jq -r '.assets[] | select(.name|startswith("gopherCap-debian-buster-")) | .browser_download_url')
+wget $GOPHER_URL
+```
+
+## Community packages
+
+### Arch linux
+
+Arch User Repository (AUR) package was contributed by a community member. It is not maintained by Stamus Networks. It can be installed with AUR helper like `yay`.
+
+```
+yay -Sy gophercap
+```
+
+Or by invoking `makepkg`.
+
+```
+git clone https://aur.archlinux.org/gophercap.git
+cd gophercap
+makepkg -si
+```
+
 ## Build and basic usage
 
-GoperCap needs on libpcap to write packets into network interface. Development headers are needed for installing and regular library must be installed for execution.
+Building GopherCap is quite easy, assuming some familiarity with Go build system. Currently it only has one Cgo dependency - libpcap. GoperCap needs libpcap to write packets into network interface. Development headers must be present for installing and regular library must be installed for execution.
 
 Ubuntu and Debian: 
 
