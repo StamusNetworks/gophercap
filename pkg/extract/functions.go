@@ -63,7 +63,7 @@ type Alert struct {
 	Tunnel Tunnel
 }
 
-func buildBPF(event Alert) string {
+func buildBPF(event Alert) (string, error) {
 	proto := event.Proto
 	src_ip := event.Src_ip
 	dest_ip := event.Dest_ip
@@ -92,8 +92,9 @@ func buildBPF(event Alert) string {
 		bpfFilter += ")"
 	default:
 		logrus.Fatal("Protocol unsupported")
+		return "", errors.New("Protocol not supported")
 	}
-	return bpfFilter
+	return bpfFilter, nil
 }
 
 func builEndpoints(event Alert) (gopacket.Flow, gopacket.Flow) {
@@ -213,10 +214,13 @@ func ExtractPcapFile(fname string, oname string, eventdata string) error {
 	}
 	defer handleRead.Close()
 
-	err = handleRead.SetBPFFilter(buildBPF(event))
-	if err != nil {
-		logrus.Fatal("Invalid BPF Filter: %v", err)
-		return err
+	bpf_filter, err := buildBPF(event)
+	if err == nil {
+		err = handleRead.SetBPFFilter(bpf_filter)
+		if err != nil {
+			logrus.Fatal("Invalid BPF Filter: %v", err)
+			return err
+		}
 	}
 	// Open up a second pcap handle for packet writes.
 	outfile, err := os.Create(oname);
