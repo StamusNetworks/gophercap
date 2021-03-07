@@ -182,6 +182,23 @@ func filterTunnel(data []byte, IPFlow gopacket.Flow, transportFlow gopacket.Flow
 	return false
 }
 
+func openPcapReaderHandle(fname string, bpf_filter string) (*pcap.Handle, error) {
+	// Open PCAP file + handle potential BPF Filter
+	handleRead, err := pcap.OpenOffline(fname)
+	if err != nil {
+		return handleRead , err
+	}
+
+	if err == nil {
+		err = handleRead.SetBPFFilter(bpf_filter)
+		if err != nil {
+			logrus.Fatal("Invalid BPF Filter: %v", err)
+			return handleRead, err
+		}
+	}
+	return handleRead, nil
+}
+
 
 /*
 Extract a pcap file for a given flow
@@ -213,21 +230,14 @@ func ExtractPcapFile(dname string, oname string, eventdata string) error {
 	fname := path.Join(dname, event.Capture_file)
 	logrus.Debugf("Extracting packets from %s", fname)
 
-	// Open PCAP file + handle potential BPF Filter
-	handleRead, err := pcap.OpenOffline(fname)
-	if err != nil {
-		return err
+	bpf_filter, bpf_err := buildBPF(event)
+	if bpf_err != nil {
+		logrus.Warning(bpf_err)
 	}
+
+	handleRead, err := openPcapReaderHandle(fname, bpf_filter)
 	defer handleRead.Close()
 
-	bpf_filter, err := buildBPF(event)
-	if err == nil {
-		err = handleRead.SetBPFFilter(bpf_filter)
-		if err != nil {
-			logrus.Fatal("Invalid BPF Filter: %v", err)
-			return err
-		}
-	}
 	// Open up a second pcap handle for packet writes.
 	outfile, err := os.Create(oname);
 	if err != nil {
