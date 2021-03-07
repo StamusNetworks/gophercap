@@ -24,6 +24,7 @@ import (
 	"os"
 	"time"
 	"fmt"
+	"path"
 
 	"encoding/json"
 
@@ -54,6 +55,7 @@ type Tunnel struct {
 
 type Alert struct {
 	Timestamp string
+	Capture_file string
 	Src_ip string
 	Dest_ip string
 	Src_port uint16
@@ -184,7 +186,7 @@ func filterTunnel(data []byte, IPFlow gopacket.Flow, transportFlow gopacket.Flow
 /*
 Extract a pcap file for a given flow
 */
-func ExtractPcapFile(fname string, oname string, eventdata string) error {
+func ExtractPcapFile(dname string, oname string, eventdata string) error {
 	/* open event file */
 	eventfile, err := os.Open(eventdata)
 	if err != nil {
@@ -207,6 +209,10 @@ func ExtractPcapFile(fname string, oname string, eventdata string) error {
 	}
 	logrus.Debugf("Flow: %v <-%v:%v-> %v\n", event.Src_ip, event.Proto, event.App_proto, event.Dest_ip)
 	IPFlow, transportFlow := builEndpoints(event)
+
+	fname := path.Join(dname, event.Capture_file)
+	logrus.Debugf("Extracting packets from %s", fname)
+
 	// Open PCAP file + handle potential BPF Filter
 	handleRead, err := pcap.OpenOffline(fname)
 	if err != nil {
