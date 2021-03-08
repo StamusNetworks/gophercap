@@ -59,7 +59,10 @@ func (p Pcap) Do(w WorkerFunc) error {
 		return err
 	}
 	defer h.Close()
-	return w(h)
+	if err := w(h); err != nil {
+		return err
+	}
+	return nil
 }
 
 /*
