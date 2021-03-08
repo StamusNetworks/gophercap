@@ -18,13 +18,15 @@ package extract
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net"
 	"os"
-	"time"
-	"fmt"
 	"path"
+	"regexp"
+	"strconv"
+	"time"
 
 	"encoding/json"
 
@@ -35,6 +37,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+const Flow_timeout time.Duration = 600 * 10^9
 
 func writePacket(handle *pcap.Handle, buf []byte) error {
 	if err := handle.WritePacketData(buf); err != nil {
@@ -63,6 +66,71 @@ type Alert struct {
 	App_proto string
 	Proto string
 	Tunnel Tunnel
+}
+
+type PcapFileList struct {
+	Files []string
+	dname string
+	fname string
+	index int
+}
+
+func NewPcapFileList(dname string, fname string) *PcapFileList {
+	pl := new(PcapFileList)
+	full_name := path.Join(dname, fname)
+	pl.Files = append(pl.Files, full_name)
+	pl.dname = dname
+	pl.fname = fname
+	pl.buildPcapList()
+	return pl
+}
+
+func (pl *PcapFileList) GetNext() (string, error) {
+	if pl.index < len(pl.Files) {
+		pfile := pl.Files[pl.index]
+		pl.index += 1
+		return pfile, nil
+	}
+	return "", errors.New("No more file")
+}
+
+func (pl *PcapFileList) buildPcapList() string {
+	logrus.Debug("Scanning directory")
+	dname := path.Dir(pl.Files[0])
+	file_part := path.Base(pl.Files[0])
+	re := regexp.MustCompile(`.*-(\d+)-(\d+).*pcap`)
+	match := re.FindStringSubmatch(file_part)
+	thread_index, err := strconv.ParseInt(match[1], 10, 64)
+	timestamp, err := strconv.ParseInt(match[2], 10, 64)
+	logrus.Debugf("File on thread %v with timestamp %v", thread_index, timestamp)
+	files, err := ioutil.ReadDir(dname)
+	if err != nil {
+		logrus.Warningf("Can't open directory %v: %v", dname, err)
+	}
+	for _, file := range files {
+		l_match := re.FindStringSubmatch(file.Name())
+		if l_match == nil {
+			continue
+		}
+		l_thread_index, err := strconv.ParseInt(l_match[1], 10, 64)
+		if err != nil {
+			logrus.Warning("Can't parse integer")
+		}
+		l_timestamp, err := strconv.ParseInt(l_match[2], 10, 64)
+		if err != nil {
+			logrus.Warning("Can't parse integer")
+		}
+		if l_thread_index != thread_index {
+			continue
+		}
+		if l_timestamp > timestamp {
+			logrus.Infof("Adding file %v", file.Name())
+			pl.Files = append(pl.Files, path.Join(dname, file.Name()))
+		} else {
+			logrus.Debugf("Skipping file %v", file.Name())
+		}
+	}
+	return "" //path.Join(next_name)
 }
 
 func buildBPF(event Alert) (string, error) {
@@ -96,6 +164,7 @@ func buildBPF(event Alert) (string, error) {
 		logrus.Fatal("Protocol unsupported")
 		return "", errors.New("Protocol not supported")
 	}
+	logrus.Debugln(bpfFilter)
 	return bpfFilter, nil
 }
 
@@ -227,16 +296,12 @@ func ExtractPcapFile(dname string, oname string, eventdata string) error {
 	logrus.Debugf("Flow: %v <-%v:%v-> %v\n", event.Src_ip, event.Proto, event.App_proto, event.Dest_ip)
 	IPFlow, transportFlow := builEndpoints(event)
 
-	fname := path.Join(dname, event.Capture_file)
-	logrus.Debugf("Extracting packets from %s", fname)
+	pcap_file_list := NewPcapFileList(dname, event.Capture_file)
 
 	bpf_filter, bpf_err := buildBPF(event)
 	if bpf_err != nil {
 		logrus.Warning(bpf_err)
 	}
-
-	handleRead, err := openPcapReaderHandle(fname, bpf_filter)
-	defer handleRead.Close()
 
 	// Open up a second pcap handle for packet writes.
 	outfile, err := os.Create(oname);
@@ -255,30 +320,74 @@ func ExtractPcapFile(dname string, oname string, eventdata string) error {
 
 	start := time.Now()
 	pkt := 0
+	/* FIXME we can do better here */
+	var last_timestamp time.Time = time.Now()
+	var first_timestamp time.Time = time.Now()
 
-	// Loop over packets and write them
-	for {
-		data, ci, err := handleRead.ReadPacketData()
+	fname, err := pcap_file_list.GetNext()
+	if err != nil {
+		logrus.Debugf("Expected at least one file: %v\n", err)
+		return nil
+	}
+	/*
+	Loop over pcap file starting with the one specified in the event
+	If timestamp of first packet > last_timestamp of flow + flow_timeout then
+	we can consider we are at the last pcap
+	*/
+	for first_timestamp.Before(last_timestamp.Add(Flow_timeout)) {
+		file_pkt := 0
+		logrus.Debugf("Reading packets from %s", fname)
+		handleRead, err := openPcapReaderHandle(fname, bpf_filter)
+		defer handleRead.Close()
+		if err != nil {
+			logrus.Warningln("This was fast")
+			break
+		}
 
-		switch {
-		case err == io.EOF:
-			logrus.Infof("Finished in %s\n", time.Since(start))
-			logrus.Infof("Written %v packet(s)\n", pkt)
-			return nil
-		case err != nil:
-			logrus.Warningf("Failed to read packet %d: %s\n", pkt, err)
-		default:
-			if event.Tunnel.Depth > 0 {
-				if filterTunnel(data, IPFlow, transportFlow, event) {
+		// Loop over packets and write them
+		need_break := false
+		for {
+			data, ci, err := handleRead.ReadPacketData()
+
+			switch {
+			case err == io.EOF:
+				need_break = true
+			case err != nil:
+				logrus.Warningf("Failed to read packet %d: %s\n", pkt, err)
+			default:
+				if event.Tunnel.Depth > 0 {
+					if filterTunnel(data, IPFlow, transportFlow, event) {
+						handleWrite.WritePacket(ci, data)
+						pkt++
+						last_timestamp = ci.Timestamp
+					}
+				} else {
 					handleWrite.WritePacket(ci, data)
 					pkt++
+					file_pkt++
 				}
-			} else {
-				handleWrite.WritePacket(ci, data)
-				pkt++
+			}
+			if need_break {
+				logrus.Debugf("Extracted %d packet(s) from pcap file %v", file_pkt, fname)
+				break
 			}
 		}
+		/* Open new pcap to see the beginning */
+		fname, err = pcap_file_list.GetNext()
+		if err != nil {
+			logrus.Debugln(err)
+			break
+		}
+		handleTest, err := openPcapReaderHandle(fname, bpf_filter)
+		defer handleTest.Close()
+		if err != nil {
+			break
+		}
+		_, ci, err := handleRead.ReadPacketData()
+		first_timestamp = ci.Timestamp
 	}
+	logrus.Infof("Finished in %s\n", time.Since(start))
+	logrus.Infof("Written %v packet(s)\n", pkt)
 
 	return nil
 }
