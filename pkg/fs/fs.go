@@ -1,7 +1,10 @@
 package fs
 
 import (
+	"errors"
+	"fmt"
 	"io"
+	"os"
 )
 
 /*
@@ -17,6 +20,16 @@ Optional suffix can be used to filter only interesting files. Such as compressed
 with pcap.gz suffix.
 */
 func NewPcapList(root, suffix string) ([]Pcap, error) {
+	if root == "" {
+		return nil, errors.New("Empty root folder for PCAP source")
+	}
+	fi, err := os.Stat(root)
+	if os.IsNotExist(err) {
+		return nil, fmt.Errorf("PCAP root folder %s does not exist", root)
+	}
+	if !fi.IsDir() {
+		return nil, fmt.Errorf("PCAP root %s should be a folder", root)
+	}
 	rx := FilePathWalkDir(root, suffix)
 	tx := make([]Pcap, 0)
 	for p := range rx {
