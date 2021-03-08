@@ -150,8 +150,10 @@ func (h *Handle) Play(ctx context.Context) error {
 		h.writer = writer
 	}
 	defer h.writer.Close()
-	if err := h.writer.SetBPFFilter(h.outBpf); err != nil {
-		return err
+	if h.outBpf != "" {
+		if err := h.writer.SetBPFFilter(h.outBpf); err != nil {
+			return err
+		}
 	}
 	var counter, lastCount uint64
 	ticker := time.NewTicker(1 * time.Second)
