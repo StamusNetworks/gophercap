@@ -53,7 +53,7 @@ type Tunnel struct {
 	Depth uint8
 }
 
-type Alert struct {
+type Event struct {
 	Timestamp string
 	Capture_file string
 	Src_ip string
@@ -164,7 +164,7 @@ func ExtractPcapFile(dname string, oname string, eventdata string) error {
 		return err
 	}
 
-	var event Alert
+	var event Event
 	err = json.Unmarshal(eventdatastring, &event)
 	if err != nil {
 		return errors.New("Can't parse JSON in " + eventdata)

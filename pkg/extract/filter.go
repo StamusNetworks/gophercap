@@ -27,7 +27,7 @@ import (
 )
 
 
-func buildBPF(event Alert) (string, error) {
+func buildBPF(event Event) (string, error) {
 	proto := event.Proto
 	src_ip := event.Src_ip
 	dest_ip := event.Dest_ip
@@ -62,7 +62,7 @@ func buildBPF(event Alert) (string, error) {
 	return bpfFilter, nil
 }
 
-func builEndpoints(event Alert) (gopacket.Flow, gopacket.Flow) {
+func builEndpoints(event Event) (gopacket.Flow, gopacket.Flow) {
 	srcIPEndpoint := layers.NewIPEndpoint(net.ParseIP(event.Src_ip))
 	destIPEndpoint := layers.NewIPEndpoint(net.ParseIP(event.Dest_ip))
 	IPFlow, err := gopacket.FlowFromEndpoints(srcIPEndpoint, destIPEndpoint)
@@ -94,7 +94,7 @@ func builEndpoints(event Alert) (gopacket.Flow, gopacket.Flow) {
 	return IPFlow, transportFlow
 }
 
-func filterTunnel(data []byte, IPFlow gopacket.Flow, transportFlow gopacket.Flow, event Alert) bool {
+func filterTunnel(data []byte, IPFlow gopacket.Flow, transportFlow gopacket.Flow, event Event) bool {
 	packet := gopacket.NewPacket(data, layers.LayerTypeEthernet, gopacket.Lazy)
 	switch event.Proto {
 	case "TCP":
