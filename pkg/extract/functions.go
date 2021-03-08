@@ -72,13 +72,18 @@ type PcapFileList struct {
 	index int
 }
 
-func NewPcapFileList(dname string, fname string) *PcapFileList {
+func NewPcapFileList(dname string, event Event) *PcapFileList {
 	pl := new(PcapFileList)
-	full_name := path.Join(dname, fname)
-	pl.Files = append(pl.Files, full_name)
 	pl.dname = dname
-	pl.fname = fname
-	pl.buildPcapList()
+	if len(event.Capture_file) > 0 {
+		full_name := path.Join(dname, event.Capture_file)
+		pl.Files = append(pl.Files, full_name)
+		pl.buildPcapList()
+		pl.fname = event.Capture_file
+	} else {
+		logrus.Debug("Scanning will start soon")
+		pl.buildFullPcapList()
+	}
 	return pl
 }
 
@@ -130,6 +135,24 @@ func (pl *PcapFileList) buildPcapList() string {
 	return "" //path.Join(next_name)
 }
 
+func (pl *PcapFileList) buildFullPcapList() string {
+	logrus.Debugf("Scanning directory: %v", pl.dname)
+	re := regexp.MustCompile(`.*-(\d+)-(\d+).*pcap`)
+	files, err := ioutil.ReadDir(pl.dname)
+	if err != nil {
+		logrus.Warningf("Can't open directory %v: %v", pl.dname, err)
+	}
+	for _, file := range files {
+		l_match := re.FindStringSubmatch(file.Name())
+		if l_match == nil {
+			continue
+		}
+		logrus.Infof("Adding file %v", file.Name())
+		pl.Files = append(pl.Files, path.Join(pl.dname, file.Name()))
+	}
+	return "" //path.Join(next_name)
+}
+
 func openPcapReaderHandle(fname string, bpf_filter string) (*pcap.Handle, error) {
 	// Open PCAP file + handle potential BPF Filter
 	handleRead, err := pcap.OpenOffline(fname)
@@ -175,7 +198,7 @@ func ExtractPcapFile(dname string, oname string, eventdata string, skip_bpf bool
 	logrus.Debugf("Flow: %v <-%v:%v-> %v\n", event.Src_ip, event.Proto, event.App_proto, event.Dest_ip)
 	IPFlow, transportFlow := builEndpoints(event)
 
-	pcap_file_list := NewPcapFileList(dname, event.Capture_file)
+	pcap_file_list := NewPcapFileList(dname, event)
 
 	var bpf_filter string = ""
 	if skip_bpf != true {
@@ -216,7 +239,7 @@ func ExtractPcapFile(dname string, oname string, eventdata string, skip_bpf bool
 	If timestamp of first packet > last_timestamp of flow + flow_timeout then
 	we can consider we are at the last pcap
 	*/
-	for first_timestamp.Before(last_timestamp.Add(Flow_timeout)) {
+	for len(event.Capture_file) == 0 || first_timestamp.Before(last_timestamp.Add(Flow_timeout)) {
 		file_pkt := 0
 		logrus.Debugf("Reading packets from %s", fname)
 		handleRead, err := openPcapReaderHandle(fname, bpf_filter)
