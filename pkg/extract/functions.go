@@ -151,7 +151,7 @@ func openPcapReaderHandle(fname string, bpf_filter string) (*pcap.Handle, error)
 /*
 Extract a pcap file for a given flow
 */
-func ExtractPcapFile(dname string, oname string, eventdata string) error {
+func ExtractPcapFile(dname string, oname string, eventdata string, skip_bpf bool) error {
 	/* open event file */
 	eventfile, err := os.Open(eventdata)
 	if err != nil {
@@ -177,9 +177,12 @@ func ExtractPcapFile(dname string, oname string, eventdata string) error {
 
 	pcap_file_list := NewPcapFileList(dname, event.Capture_file)
 
-	bpf_filter, bpf_err := buildBPF(event)
-	if bpf_err != nil {
-		logrus.Warning(bpf_err)
+	var bpf_filter string = ""
+	if skip_bpf != true {
+		bpf_filter, err = buildBPF(event)
+		if err != nil {
+			logrus.Warning(err)
+		}
 	}
 
 	// Open up a second pcap handle for packet writes.
@@ -234,7 +237,7 @@ func ExtractPcapFile(dname string, oname string, eventdata string) error {
 			case err != nil:
 				logrus.Warningf("Failed to read packet %d: %s\n", pkt, err)
 			default:
-				if event.Tunnel.Depth > 0 {
+				if skip_bpf == true || event.Tunnel.Depth > 0 {
 					if filterTunnel(data, IPFlow, transportFlow, event) {
 						handleWrite.WritePacket(ci, data)
 						pkt++

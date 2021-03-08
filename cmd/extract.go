@@ -33,10 +33,11 @@ Example usage:
 gopherCap extract \
 	--dir-pcap /var/log/suricata \
 	--event /tmp/event.json \
-	--dump-pcap /tmp/event.pcap
+	--dump-pcap /tmp/event.pcap \
+	--skip-bpf
 `,
 	Run: func(cmd *cobra.Command, args []string) {
-		extract.ExtractPcapFile(viper.GetString("extract.dir.pcap"), viper.GetString("extract.dump.pcap"), viper.GetString("extract.event"))
+		extract.ExtractPcapFile(viper.GetString("extract.dir.pcap"), viper.GetString("extract.dump.pcap"), viper.GetString("extract.event"), viper.GetBool("extract.skip.bpf"))
 	},
 }
 
@@ -52,4 +53,7 @@ func init() {
 	extractCmd.PersistentFlags().String("dump-pcap", "",
 		`Pcap file to extract data to.`)
 	viper.BindPFlag("extract.dump.pcap", extractCmd.PersistentFlags().Lookup("dump-pcap"))
+	extractCmd.PersistentFlags(). Bool("skip-bpf", false,
+		`Explicitely extract data with gopacket parsing. Slower but more accurate.`)
+	viper.BindPFlag("extract.skip.bpf", extractCmd.PersistentFlags().Lookup("skip-bpf"))
 }
