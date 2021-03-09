@@ -84,7 +84,7 @@ func openPcapReaderHandle(fname string, bpf_filter string) (*pcap.Handle, error)
 /*
 Extract a pcap file for a given flow
 */
-func ExtractPcapFile(dname string, oname string, eventdata string, skip_bpf bool) error {
+func ExtractPcapFile(dname string, oname string, eventdata string, skip_bpf bool, file_format string) error {
 	/* open event file */
 	eventfile, err := os.Open(eventdata)
 	if err != nil {
@@ -119,7 +119,10 @@ func ExtractPcapFile(dname string, oname string, eventdata string, skip_bpf bool
 	logrus.Debugf("Flow: %v <-%v:%v-> %v\n", event.Src_ip, event.Proto, event.App_proto, event.Dest_ip)
 	IPFlow, transportFlow := builEndpoints(event)
 
-	pcap_file_list := NewPcapFileList(dname, event)
+	pcap_file_list := NewPcapFileList(dname, event, file_format)
+	if pcap_file_list == nil {
+		return errors.New("Problem when building pcap file list")
+	}
 
 	var bpf_filter string = ""
 	if skip_bpf != true {

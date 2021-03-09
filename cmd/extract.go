@@ -34,10 +34,11 @@ gopherCap extract \
 	--dir-pcap /var/log/suricata \
 	--event /tmp/event.json \
 	--dump-pcap /tmp/event.pcap \
+	--file-format log-%n-%t.pcap \
 	--skip-bpf
 `,
 	Run: func(cmd *cobra.Command, args []string) {
-		extract.ExtractPcapFile(viper.GetString("extract.dir.pcap"), viper.GetString("extract.dump.pcap"), viper.GetString("extract.event"), viper.GetBool("extract.skip.bpf"))
+		extract.ExtractPcapFile(viper.GetString("extract.dir.pcap"), viper.GetString("extract.dump.pcap"), viper.GetString("extract.event"), viper.GetBool("extract.skip.bpf"), viper.GetString("extract.file.format"))
 	},
 }
 
@@ -56,4 +57,7 @@ func init() {
 	extractCmd.PersistentFlags(). Bool("skip-bpf", false,
 		`Explicitely extract data with gopacket parsing. Slower but more accurate.`)
 	viper.BindPFlag("extract.skip.bpf", extractCmd.PersistentFlags().Lookup("skip-bpf"))
+	extractCmd.PersistentFlags().String("file-format", "pcap.%n.%t",
+		`How pcap file are named by Suricata.`)
+	viper.BindPFlag("extract.file.format", extractCmd.PersistentFlags().Lookup("file-format"))
 }
