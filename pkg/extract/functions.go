@@ -192,6 +192,16 @@ func ExtractPcapFile(dname string, oname string, eventdata string, skip_bpf bool
 	if err != nil {
 		return errors.New("Can't parse JSON in " + eventdata)
 	}
+
+	if len(event.Capture_file) > 0 {
+		filename := path.Join(dname, event.Capture_file)
+		_, err := os.Stat(filename)
+		if os.IsNotExist(err) {
+			logrus.Errorf("File %v does not exist", filename)
+			return err
+		}
+	}
+
 	if event.Tunnel.Depth != 0 {
 		logrus.Debugf("Tunnel: %v <-%v-> %v\n", event.Tunnel.Src_ip, event.Tunnel.Proto, event.Tunnel.Dest_ip)
 	}
