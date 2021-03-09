@@ -43,24 +43,24 @@ func writePacket(handle *pcap.Handle, buf []byte) error {
 }
 
 type Tunnel struct {
-	Src_ip string
-	Dest_ip string
-	Src_port uint16
-	Dest_port uint16
-	Proto string
-	Depth uint8
+	SrcIp string `json:"src_ip"`
+	DestIp string `json:"dest_ip"`
+	SrcPort uint16 `json:"src_port"`
+	DestPort uint16 `json:"dest_port"`
+	Proto string `json:"proto"`
+	Depth uint8 `json:"depth"`
 }
 
 type Event struct {
 	Timestamp string
 	Capture_file string
-	Src_ip string
-	Dest_ip string
-	Src_port uint16
-	Dest_port uint16
-	App_proto string
-	Proto string
-	Tunnel Tunnel
+	SrcIp string `json:"src_ip"`
+	DestIp string `json:"dest_ip"`
+	SrcPort uint16 `json:"src_port"`
+	DestPort uint16 `json:"dest_port"`
+	AppProto string `json:"app_proto"`
+	Proto string `json:"proto"`
+	Tunnel Tunnel `json:"tunnel"`
 }
 
 func openPcapReaderHandle(fname string, bpf_filter string) (*pcap.Handle, error) {
@@ -114,9 +114,9 @@ func ExtractPcapFile(dname string, oname string, eventdata string, skip_bpf bool
 	}
 
 	if event.Tunnel.Depth != 0 {
-		logrus.Debugf("Tunnel: %v <-%v-> %v\n", event.Tunnel.Src_ip, event.Tunnel.Proto, event.Tunnel.Dest_ip)
+		logrus.Debugf("Tunnel: %v <-%v-> %v\n", event.Tunnel.SrcIp, event.Tunnel.Proto, event.Tunnel.DestIp)
 	}
-	logrus.Debugf("Flow: %v <-%v:%v-> %v\n", event.Src_ip, event.Proto, event.App_proto, event.Dest_ip)
+	logrus.Debugf("Flow: %v <-%v:%v-> %v\n", event.SrcIp, event.Proto, event.AppProto, event.DestIp)
 	IPFlow, transportFlow := builEndpoints(event)
 
 	pcap_file_list := NewPcapFileList(dname, event, file_format)

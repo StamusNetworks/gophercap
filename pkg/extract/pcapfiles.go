@@ -29,12 +29,12 @@ import (
 
 type PcapFileList struct {
 	Files []string
-	dname string
-	fname string
-	index int
-	file_parsing *regexp.Regexp
-	thread_index int
-	timestamp_index int
+	DirName string
+	FileName string
+	Index int
+	FileParsing *regexp.Regexp
+	ThreadIndex int
+	TimestampIndex int
 }
 
 /* Suricata supports following expansion
@@ -50,28 +50,28 @@ func (pl *PcapFileList) buildPcapNameParsing(file_format string) {
 	}
 	timestamp_index := strings.Index(file_format, "%t")
 	if thread_index < timestamp_index {
-		pl.thread_index = 1
-		pl.timestamp_index = 2
+		pl.ThreadIndex = 1
+		pl.TimestampIndex = 2
 	} else {
-		pl.thread_index = 2
-		pl.timestamp_index = 1
+		pl.ThreadIndex = 2
+		pl.TimestampIndex = 1
 	}
 	/* handle the case where just the timestamp is available */
 	if thread_index == -1 {
-		pl.thread_index = -1
-		pl.timestamp_index = 1
+		pl.ThreadIndex = -1
+		pl.TimestampIndex = 1
 	}
 	regexp_string := strings.Replace(file_format, "%n", `(\d+)`, 1)
 	regexp_string = strings.Replace(regexp_string, "%i", `(\d+)`, 1)
 	regexp_string = strings.Replace(regexp_string, "%t", `(\d+)`, 1)
 	logrus.Debug("Using regexp: ", regexp_string)
 	/* build regular expression */
-	pl.file_parsing = regexp.MustCompile(regexp_string)
+	pl.FileParsing = regexp.MustCompile(regexp_string)
 }
 
 func NewPcapFileList(dname string, event Event, file_format string) *PcapFileList {
 	pl := new(PcapFileList)
-	pl.dname = dname
+	pl.DirName = dname
 	pl.buildPcapNameParsing(file_format)
 	if len(event.Capture_file) > 0 {
 		full_name := path.Join(dname, event.Capture_file)
@@ -80,7 +80,7 @@ func NewPcapFileList(dname string, event Event, file_format string) *PcapFileLis
 		if err != nil {
 			return nil
 		}
-		pl.fname = event.Capture_file
+		pl.FileName = event.Capture_file
 	} else {
 		logrus.Debug("Scanning will start soon")
 		err := pl.buildFullPcapList()
@@ -92,9 +92,9 @@ func NewPcapFileList(dname string, event Event, file_format string) *PcapFileLis
 }
 
 func (pl *PcapFileList) GetNext() (string, error) {
-	if pl.index < len(pl.Files) {
-		pfile := pl.Files[pl.index]
-		pl.index += 1
+	if pl.Index < len(pl.Files) {
+		pfile := pl.Files[pl.Index]
+		pl.Index += 1
 		return pfile, nil
 	}
 	return "", errors.New("No more file")
@@ -104,16 +104,16 @@ func (pl *PcapFileList) buildPcapList() error {
 	dname := path.Dir(pl.Files[0])
 	logrus.Debug("Scanning directory: ", dname)
 	file_part := path.Base(pl.Files[0])
-	match := pl.file_parsing.FindStringSubmatch(file_part)
+	match := pl.FileParsing.FindStringSubmatch(file_part)
 	if len(match) == 0 {
 		logrus.Errorf("file %v does not match file format", file_part)
 		return errors.New("Invalid file name in event")
 	}
 	var thread_index int64 = -1
-	if (pl.thread_index != -1) {
-		thread_index, _ = strconv.ParseInt(match[pl.thread_index], 10, 64)
+	if (pl.ThreadIndex != -1) {
+		thread_index, _ = strconv.ParseInt(match[pl.ThreadIndex], 10, 64)
 	}
-	timestamp, err := strconv.ParseInt(match[pl.timestamp_index], 10, 64)
+	timestamp, err := strconv.ParseInt(match[pl.TimestampIndex], 10, 64)
 	files, err := ioutil.ReadDir(dname)
 	if err != nil {
 		logrus.Warningf("Can't open directory %v: %v", dname, err)
@@ -122,12 +122,12 @@ func (pl *PcapFileList) buildPcapList() error {
 		if file.Name() == file_part {
 			continue
 		}
-		l_match := pl.file_parsing.FindStringSubmatch(file.Name())
+		l_match := pl.FileParsing.FindStringSubmatch(file.Name())
 		if l_match == nil {
 			continue
 		}
-		if pl.thread_index != -1 {
-			l_thread_index, err := strconv.ParseInt(l_match[pl.thread_index], 10, 64)
+		if pl.ThreadIndex != -1 {
+			l_thread_index, err := strconv.ParseInt(l_match[pl.ThreadIndex], 10, 64)
 			if err != nil {
 				logrus.Warning("Can't parse integer")
 			}
@@ -135,7 +135,7 @@ func (pl *PcapFileList) buildPcapList() error {
 				continue
 			}
 		}
-		l_timestamp, err := strconv.ParseInt(l_match[pl.timestamp_index], 10, 64)
+		l_timestamp, err := strconv.ParseInt(l_match[pl.TimestampIndex], 10, 64)
 		if err != nil {
 			logrus.Warning("Can't parse integer")
 		}
@@ -150,19 +150,19 @@ func (pl *PcapFileList) buildPcapList() error {
 }
 
 func (pl *PcapFileList) buildFullPcapList() error {
-	logrus.Debugf("Scanning directory: %v", pl.dname)
-	files, err := ioutil.ReadDir(pl.dname)
+	logrus.Debugf("Scanning directory: %v", pl.DirName)
+	files, err := ioutil.ReadDir(pl.DirName)
 	if err != nil {
-		logrus.Warningf("Can't open directory %v: %v", pl.dname, err)
+		logrus.Warningf("Can't open directory %v: %v", pl.DirName, err)
 		return errors.New("Can't open directory")
 	}
 	for _, file := range files {
-		l_match := pl.file_parsing.FindStringSubmatch(file.Name())
+		l_match := pl.FileParsing.FindStringSubmatch(file.Name())
 		if l_match == nil {
 			continue
 		}
 		logrus.Infof("Adding file %v", file.Name())
-		pl.Files = append(pl.Files, path.Join(pl.dname, file.Name()))
+		pl.Files = append(pl.Files, path.Join(pl.DirName, file.Name()))
 	}
 	return nil
 }
