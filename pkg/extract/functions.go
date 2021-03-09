@@ -203,6 +203,7 @@ func ExtractPcapFile(dname string, oname string, eventdata string, skip_bpf bool
 			logrus.Errorf("File %v does not exist", filename)
 			return err
 		}
+		logrus.Debugf("Starting from file %v", filename)
 	}
 
 	if event.Tunnel.Depth != 0 {
