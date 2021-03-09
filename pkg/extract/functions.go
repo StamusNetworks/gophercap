@@ -110,6 +110,9 @@ func (pl *PcapFileList) buildPcapList() string {
 		logrus.Warningf("Can't open directory %v: %v", dname, err)
 	}
 	for _, file := range files {
+		if file.Name() == file_part {
+			continue
+		}
 		l_match := re.FindStringSubmatch(file.Name())
 		if l_match == nil {
 			continue
