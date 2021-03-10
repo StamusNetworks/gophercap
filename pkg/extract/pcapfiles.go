@@ -129,6 +129,7 @@ func (pl *PcapFileList) buildPcapList() error {
 	timestamp, err := strconv.ParseInt(match[pl.TimestampIndex], 10, 64)
 	if err != nil {
 		logrus.Warning("Can't parse integer")
+		return errors.New("Invalid timestamp in file name")
 	}
 	files, err := ioutil.ReadDir(dName)
 	if err != nil {
