@@ -36,6 +36,8 @@ func buildBPF(event Event) (string, error) {
 		proto = event.Tunnel.Proto
 		srcIp = event.Tunnel.SrcIp
 		destIp = event.Tunnel.DestIp
+		srcPort = event.Tunnel.SrcPort
+		destPort = event.Tunnel.DestPort
 	}
 	bpfFilter := "proto " + proto + " and "
 	switch proto {
