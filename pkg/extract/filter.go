@@ -54,7 +54,7 @@ func buildBPF(event Event) (string, error) {
 		}
 		bpfFilter += ")"
 	default:
-		logrus.Fatal("Protocol unsupported")
+		logrus.Error("Protocol unsupported")
 		return "", errors.New("Protocol not supported")
 	}
 	logrus.Debugln(bpfFilter)
@@ -66,7 +66,7 @@ func builEndpoints(event Event) (gopacket.Flow, gopacket.Flow) {
 	destIPEndpoint := layers.NewIPEndpoint(net.ParseIP(event.DestIp))
 	IPFlow, err := gopacket.FlowFromEndpoints(srcIPEndpoint, destIPEndpoint)
 	if err != nil {
-		logrus.Fatal("Can not create IP Flow", err)
+		logrus.Error("Can not create IP Flow: ", err)
 	}
 
 	var srcEndpoint gopacket.Endpoint
@@ -82,13 +82,13 @@ func builEndpoints(event Event) (gopacket.Flow, gopacket.Flow) {
 		srcEndpoint = layers.NewSCTPPortEndpoint(layers.SCTPPort(event.SrcPort))
 		destEndpoint = layers.NewSCTPPortEndpoint(layers.SCTPPort(event.DestPort))
 	default:
-		logrus.Fatal("Protocol unsupported " + event.Proto)
+		logrus.Error("Protocol unsupported " + event.Proto)
 		return IPFlow, gopacket.InvalidFlow
 	}
 
 	transportFlow, err := gopacket.FlowFromEndpoints(srcEndpoint, destEndpoint)
 	if err != nil {
-		logrus.Fatal("Can not create transport Flow", err)
+		logrus.Error("Can not create transport Flow", err)
 	}
 	return IPFlow, transportFlow
 }
@@ -111,7 +111,7 @@ func filterTunnel(data []byte, IPFlow gopacket.Flow, transportFlow gopacket.Flow
 					case "VXLAN":
 						tLayer = packet.Layer(layers.LayerTypeVXLAN)
 					default:
-						logrus.Fatal("Unsupported tunnel type: " + event.Tunnel.Proto)
+						logrus.Error("Unsupported tunnel type: " + event.Tunnel.Proto)
 					}
 					actualPacket := gopacket.NewPacket(tLayer.LayerPayload(), layers.LayerTypeIPv4, gopacket.Lazy)
 					networkLayer = actualPacket.NetworkLayer()

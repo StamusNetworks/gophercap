@@ -73,7 +73,7 @@ func openPcapReaderHandle(fName string, bpfFilter string) (*pcap.Handle, error) 
 	if err == nil {
 		err = handleRead.SetBPFFilter(bpfFilter)
 		if err != nil {
-			logrus.Fatal("Invalid BPF Filter: %v", err)
+			logrus.Errorf("Invalid BPF Filter: %v", err)
 			return handleRead, err
 		}
 	}
@@ -134,7 +134,7 @@ func ExtractPcapFile(dName string, oName string, eventData string, skipBpf bool,
 	// Open up a second pcap handle for packet writes.
 	outfile, err := os.Create(oName)
 	if err != nil {
-		logrus.Fatal("Can't open pcap output file:", err)
+		logrus.Error("Can't open pcap output file: ", err)
 		return err
 	}
 	defer outfile.Close()
@@ -142,7 +142,7 @@ func ExtractPcapFile(dName string, oName string, eventData string, skipBpf bool,
 	handleWrite := pcapgo.NewWriter(outfile)
 	handleWrite.WriteFileHeader(65536, layers.LinkTypeEthernet) // new file, must do this.
 	if err != nil {
-		logrus.Fatal("Can't write to output file:", err)
+		logrus.Error("Can't write to output file: ", err)
 		return err
 	}
 
