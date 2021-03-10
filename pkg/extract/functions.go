@@ -150,7 +150,7 @@ func ExtractPcapFile(dName string, oName string, eventData string, skipBpf bool,
 	}
 
 	start := time.Now()
-	pkt := 0
+	var pktCount uint64 = 0
 	/* FIXME we can do better here */
 	var lastTimestamp time.Time = time.Now()
 	var firstTimestamp time.Time = time.Now()
@@ -184,17 +184,17 @@ func ExtractPcapFile(dName string, oName string, eventData string, skipBpf bool,
 			case err == io.EOF:
 				needBreak = true
 			case err != nil:
-				logrus.Warningf("Failed to read packet %d: %s\n", pkt, err)
+				logrus.Warningf("Failed to read packet %d: %s\n", pktCount, err)
 			default:
 				if skipBpf == true || event.Tunnel.Depth > 0 {
 					if filterTunnel(data, IPFlow, transportFlow, event) {
 						handleWrite.WritePacket(ci, data)
-						pkt++
+						pktCount++
 						lastTimestamp = ci.Timestamp
 					}
 				} else {
 					handleWrite.WritePacket(ci, data)
-					pkt++
+					pktCount++
 					filePkt++
 				}
 			}
@@ -218,7 +218,7 @@ func ExtractPcapFile(dName string, oName string, eventData string, skipBpf bool,
 		firstTimestamp = ci.Timestamp
 	}
 	logrus.Infof("Finished in %s\n", time.Since(start))
-	logrus.Infof("Written %v packet(s)\n", pkt)
+	logrus.Infof("Written %v packet(s)\n", pktCount)
 
 	return nil
 }
