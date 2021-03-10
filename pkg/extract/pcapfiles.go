@@ -107,6 +107,9 @@ func (pl *PcapFileList) GetNext() (string, error) {
 }
 
 func (pl *PcapFileList) buildPcapList() error {
+	if pl.Files == nil || len(pl.Files) < 1 {
+		return errors.New("No file available")
+	}
 	dName := path.Dir(pl.Files[0])
 	logrus.Debug("Scanning directory: ", dName)
 	filePart := path.Base(pl.Files[0])
