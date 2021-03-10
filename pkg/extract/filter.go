@@ -28,22 +28,22 @@ import (
 
 func buildBPF(event Event) (string, error) {
 	proto := event.Proto
-	src_ip := event.SrcIp
-	dest_ip := event.DestIp
-	src_port := event.SrcPort
-	dest_port := event.DestPort
+	srcIp := event.SrcIp
+	destIp := event.DestIp
+	srcPort := event.SrcPort
+	destPort := event.DestPort
 	if event.Tunnel.Depth != 0 {
 		proto = event.Tunnel.Proto
-		src_ip = event.Tunnel.SrcIp
-		dest_ip = event.Tunnel.DestIp
+		srcIp = event.Tunnel.SrcIp
+		destIp = event.Tunnel.DestIp
 	}
 	bpfFilter := "proto " + proto + " and "
 	switch proto {
 	case "TCP", "UDP":
 		bpfFilter += "("
-		bpfFilter += fmt.Sprintf("(src host %v and src port %v and dst host %v and dst port %v)", src_ip, src_port, dest_ip, dest_port)
+		bpfFilter += fmt.Sprintf("(src host %v and src port %v and dst host %v and dst port %v)", srcIp, srcPort, destIp, destPort)
 		bpfFilter += " or "
-		bpfFilter += fmt.Sprintf("(src host %v and src port %v and dst host %v and dst port %v)", dest_ip, dest_port, src_ip, src_port)
+		bpfFilter += fmt.Sprintf("(src host %v and src port %v and dst host %v and dst port %v)", destIp, destPort, srcIp, srcPort)
 		bpfFilter += ")"
 	case "GRE":
 		bpfFilter += "("
