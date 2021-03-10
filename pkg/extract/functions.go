@@ -73,7 +73,7 @@ func openPcapReaderHandle(fName string, bpfFilter string) (*pcap.Handle, error) 
 	if err == nil {
 		err = handleRead.SetBPFFilter(bpfFilter)
 		if err != nil {
-			logrus.Errorf("Invalid BPF Filter: %v", err)
+			logrus.Errorf("Invalid BPF Filter: %s", err)
 			return handleRead, err
 		}
 	}
@@ -106,16 +106,16 @@ func ExtractPcapFile(dName string, oName string, eventData string, skipBpf bool,
 		filename := path.Join(dName, event.CaptureFile)
 		_, err := os.Stat(filename)
 		if os.IsNotExist(err) {
-			logrus.Errorf("File %v does not exist", filename)
+			logrus.Errorf("File %s does not exist", filename)
 			return err
 		}
-		logrus.Debugf("Starting from file %v", filename)
+		logrus.Debugf("Starting from file %s", filename)
 	}
 
 	if event.Tunnel.Depth != 0 {
-		logrus.Debugf("Tunnel: %v <-%v-> %v\n", event.Tunnel.SrcIp, event.Tunnel.Proto, event.Tunnel.DestIp)
+		logrus.Debugf("Tunnel: %s <-%s-> %s\n", event.Tunnel.SrcIp, event.Tunnel.Proto, event.Tunnel.DestIp)
 	}
-	logrus.Debugf("Flow: %v <-%v:%v-> %v\n", event.SrcIp, event.Proto, event.AppProto, event.DestIp)
+	logrus.Debugf("Flow: %s <-%s:%s-> %s\n", event.SrcIp, event.Proto, event.AppProto, event.DestIp)
 	IPFlow, transportFlow, err := builEndpoints(event)
 	if err != nil {
 		return err
@@ -159,7 +159,7 @@ func ExtractPcapFile(dName string, oName string, eventData string, skipBpf bool,
 	if err != nil {
 		switch err.(type) {
 		case ErrOutOfFiles, *ErrOutOfFiles:
-			logrus.Debugf("Expected at least one file: %v\n", err)
+			logrus.Debugf("Expected at least one file: %s\n", err)
 			return nil
 		default:
 			return err
@@ -204,7 +204,7 @@ func ExtractPcapFile(dName string, oName string, eventData string, skipBpf bool,
 				}
 			}
 			if needBreak {
-				logrus.Debugf("Extracted %d packet(s) from pcap file %v", filePkt, fName)
+				logrus.Debugf("Extracted %d packet(s) from pcap file %s", filePkt, fName)
 				break
 			}
 		}
@@ -223,7 +223,7 @@ func ExtractPcapFile(dName string, oName string, eventData string, skipBpf bool,
 		firstTimestamp = ci.Timestamp
 	}
 	logrus.Infof("Finished in %s\n", time.Since(start))
-	logrus.Infof("Written %v packet(s)\n", pktCount)
+	logrus.Infof("Written %d packet(s)\n", pktCount)
 
 	return nil
 }
