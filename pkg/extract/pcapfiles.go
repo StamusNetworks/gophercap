@@ -110,9 +110,16 @@ func (pl *PcapFileList) buildPcapList() error {
 	}
 	var threadIndex int64 = -1
 	if pl.ThreadIndex != -1 {
-		threadIndex, _ = strconv.ParseInt(match[pl.ThreadIndex], 10, 64)
+		var err error
+		threadIndex, err = strconv.ParseInt(match[pl.ThreadIndex], 10, 64)
+		if err != nil {
+			logrus.Warning("Can't parse integer")
+		}
 	}
 	timestamp, err := strconv.ParseInt(match[pl.TimestampIndex], 10, 64)
+	if err != nil {
+		logrus.Warning("Can't parse integer")
+	}
 	files, err := ioutil.ReadDir(dName)
 	if err != nil {
 		logrus.Warningf("Can't open directory %v: %v", dName, err)
