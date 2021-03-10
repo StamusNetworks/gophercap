@@ -157,8 +157,13 @@ func ExtractPcapFile(dName string, oName string, eventData string, skipBpf bool,
 
 	fName, err := pcapFileList.GetNext()
 	if err != nil {
-		logrus.Debugf("Expected at least one file: %v\n", err)
-		return nil
+		switch err.(type) {
+		case ErrOutOfFiles, *ErrOutOfFiles:
+			logrus.Debugf("Expected at least one file: %v\n", err)
+			return nil
+		default:
+			return err
+		}
 	}
 	/*
 		Loop over pcap file starting with the one specified in the event

@@ -36,6 +36,13 @@ type PcapFileList struct {
 	TimestampIndex int
 }
 
+type ErrOutOfFiles struct {
+}
+
+func (e ErrOutOfFiles) Error() string {
+	return "No more files"
+}
+
 /* Suricata supports following expansion
 - %n -- thread number
 - %i -- thread id
@@ -96,7 +103,7 @@ func (pl *PcapFileList) GetNext() (string, error) {
 		pl.Index += 1
 		return pfile, nil
 	}
-	return "", errors.New("No more file")
+	return "", &ErrOutOfFiles{}
 }
 
 func (pl *PcapFileList) buildPcapList() error {
