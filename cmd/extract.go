@@ -19,6 +19,7 @@ package cmd
 import (
 	"gopherCap/pkg/extract"
 
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -38,7 +39,9 @@ gopherCap extract \
 	--skip-bpf
 `,
 	Run: func(cmd *cobra.Command, args []string) {
-		extract.ExtractPcapFile(viper.GetString("extract.dir.pcap"), viper.GetString("extract.dump.pcap"), viper.GetString("extract.event"), viper.GetBool("extract.skip.bpf"), viper.GetString("extract.file.format"))
+		if err := extract.ExtractPcapFile(viper.GetString("extract.dir.pcap"), viper.GetString("extract.dump.pcap"), viper.GetString("extract.event"), viper.GetBool("extract.skip.bpf"), viper.GetString("extract.file.format")); err != nil {
+			logrus.Fatal(err)
+		}
 	},
 }
 

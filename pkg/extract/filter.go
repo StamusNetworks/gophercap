@@ -61,7 +61,7 @@ func buildBPF(event Event) (string, error) {
 	return bpfFilter, nil
 }
 
-func builEndpoints(event Event) (gopacket.Flow, gopacket.Flow) {
+func builEndpoints(event Event) (gopacket.Flow, gopacket.Flow, error) {
 	srcIPEndpoint := layers.NewIPEndpoint(net.ParseIP(event.SrcIp))
 	destIPEndpoint := layers.NewIPEndpoint(net.ParseIP(event.DestIp))
 	IPFlow, err := gopacket.FlowFromEndpoints(srcIPEndpoint, destIPEndpoint)
@@ -83,14 +83,14 @@ func builEndpoints(event Event) (gopacket.Flow, gopacket.Flow) {
 		destEndpoint = layers.NewSCTPPortEndpoint(layers.SCTPPort(event.DestPort))
 	default:
 		logrus.Error("Protocol unsupported " + event.Proto)
-		return IPFlow, gopacket.InvalidFlow
+		return IPFlow, gopacket.InvalidFlow, errors.New("Unsupported protocol " + event.Proto)
 	}
 
 	transportFlow, err := gopacket.FlowFromEndpoints(srcEndpoint, destEndpoint)
 	if err != nil {
 		logrus.Error("Can not create transport Flow", err)
 	}
-	return IPFlow, transportFlow
+	return IPFlow, transportFlow, err
 }
 
 func filterTunnel(data []byte, IPFlow gopacket.Flow, transportFlow gopacket.Flow, event Event) bool {

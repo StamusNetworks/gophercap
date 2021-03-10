@@ -116,7 +116,10 @@ func ExtractPcapFile(dName string, oName string, eventData string, skipBpf bool,
 		logrus.Debugf("Tunnel: %v <-%v-> %v\n", event.Tunnel.SrcIp, event.Tunnel.Proto, event.Tunnel.DestIp)
 	}
 	logrus.Debugf("Flow: %v <-%v:%v-> %v\n", event.SrcIp, event.Proto, event.AppProto, event.DestIp)
-	IPFlow, transportFlow := builEndpoints(event)
+	IPFlow, transportFlow, err := builEndpoints(event)
+	if err != nil {
+		return err
+	}
 
 	pcapFileList := NewPcapFileList(dName, event, fileFormat)
 	if pcapFileList == nil {
