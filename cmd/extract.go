@@ -54,10 +54,10 @@ func init() {
 	extractCmd.PersistentFlags().String("dump-pcap", "",
 		`Pcap file to extract data to.`)
 	viper.BindPFlag("extract.dump.pcap", extractCmd.PersistentFlags().Lookup("dump-pcap"))
-	extractCmd.PersistentFlags(). Bool("skip-bpf", false,
+	extractCmd.PersistentFlags().Bool("skip-bpf", false,
 		`Explicitely extract data with gopacket parsing. Slower but more accurate.`)
 	viper.BindPFlag("extract.skip.bpf", extractCmd.PersistentFlags().Lookup("skip-bpf"))
 	extractCmd.PersistentFlags().String("file-format", "pcap.%n.%t",
-		`How pcap file are named by Suricata.`)
+		`How pcap files are named by Suricata.`)
 	viper.BindPFlag("extract.file.format", extractCmd.PersistentFlags().Lookup("file-format"))
 }

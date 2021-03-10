@@ -26,7 +26,6 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-
 func buildBPF(event Event) (string, error) {
 	proto := event.Proto
 	src_ip := event.SrcIp
@@ -118,7 +117,7 @@ func filterTunnel(data []byte, IPFlow gopacket.Flow, transportFlow gopacket.Flow
 					networkLayer = actualPacket.NetworkLayer()
 				}
 				nFlow := networkLayer.NetworkFlow()
-				if nFlow == IPFlow  ||  nFlow == IPFlow.Reverse()  {
+				if nFlow == IPFlow || nFlow == IPFlow.Reverse() {
 					return true
 				}
 			}
@@ -144,5 +143,3 @@ func filterTunnel(data []byte, IPFlow gopacket.Flow, transportFlow gopacket.Flow
 	}
 	return false
 }
-
-
