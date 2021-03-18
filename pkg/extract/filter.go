@@ -28,14 +28,14 @@ import (
 
 func buildBPF(event Event) (string, error) {
 	proto := event.Proto
-	srcIp := event.SrcIp
-	destIp := event.DestIp
+	srcIp := event.SrcIP
+	destIp := event.DestIP
 	srcPort := event.SrcPort
 	destPort := event.DestPort
 	if event.Tunnel.Depth != 0 {
 		proto = event.Tunnel.Proto
-		srcIp = event.Tunnel.SrcIp
-		destIp = event.Tunnel.DestIp
+		srcIp = event.Tunnel.SrcIP
+		destIp = event.Tunnel.DestIP
 		srcPort = event.Tunnel.SrcPort
 		destPort = event.Tunnel.DestPort
 	}
@@ -43,29 +43,28 @@ func buildBPF(event Event) (string, error) {
 	switch proto {
 	case "TCP", "UDP":
 		bpfFilter += "("
-		bpfFilter += fmt.Sprintf("(src host %v and src port %v and dst host %v and dst port %v)", srcIp, srcPort, destIp, destPort)
+		bpfFilter += fmt.Sprintf("(src host %s and src port %d and dst host %s and dst port %d)", srcIp, srcPort, destIp, destPort)
 		bpfFilter += " or "
-		bpfFilter += fmt.Sprintf("(src host %v and src port %v and dst host %v and dst port %v)", destIp, destPort, srcIp, srcPort)
+		bpfFilter += fmt.Sprintf("(src host %s and src port %d and dst host %s and dst port %d)", destIp, destPort, srcIp, srcPort)
 		bpfFilter += ")"
 	case "GRE":
 		bpfFilter += "("
 		if event.Tunnel.Depth != 0 {
-			bpfFilter += fmt.Sprintf("host %v and host %v", event.Tunnel.SrcIp, event.Tunnel.DestIp)
+			bpfFilter += fmt.Sprintf("host %v and host %v", event.Tunnel.SrcIP, event.Tunnel.DestIP)
 		} else {
-			bpfFilter += fmt.Sprintf("host %v and host %v", event.SrcIp, event.DestIp)
+			bpfFilter += fmt.Sprintf("host %v and host %v", event.SrcIP, event.DestIP)
 		}
 		bpfFilter += ")"
 	default:
-		logrus.Error("Protocol unsupported")
 		return "", errors.New("Protocol not supported")
 	}
 	logrus.Debugln(bpfFilter)
 	return bpfFilter, nil
 }
 
-func builEndpoints(event Event) (gopacket.Flow, gopacket.Flow, error) {
-	srcIPEndpoint := layers.NewIPEndpoint(net.ParseIP(event.SrcIp))
-	destIPEndpoint := layers.NewIPEndpoint(net.ParseIP(event.DestIp))
+func buildEndpoints(event Event) (gopacket.Flow, gopacket.Flow, error) {
+	srcIPEndpoint := layers.NewIPEndpoint(net.ParseIP(event.SrcIP))
+	destIPEndpoint := layers.NewIPEndpoint(net.ParseIP(event.DestIP))
 	IPFlow, err := gopacket.FlowFromEndpoints(srcIPEndpoint, destIPEndpoint)
 	if err != nil {
 		logrus.Error("Can not create IP Flow: ", err)
@@ -84,7 +83,6 @@ func builEndpoints(event Event) (gopacket.Flow, gopacket.Flow, error) {
 		srcEndpoint = layers.NewSCTPPortEndpoint(layers.SCTPPort(event.SrcPort))
 		destEndpoint = layers.NewSCTPPortEndpoint(layers.SCTPPort(event.DestPort))
 	default:
-		logrus.Error("Protocol unsupported " + event.Proto)
 		return IPFlow, gopacket.InvalidFlow, errors.New("Unsupported protocol " + event.Proto)
 	}
 

@@ -18,13 +18,23 @@ package extract
 
 import (
 	"errors"
-	"github.com/sirupsen/logrus"
+	"fmt"
 	"io/ioutil"
 	"path"
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
+
+	"github.com/sirupsen/logrus"
 )
+
+type ErrOutOfFiles struct {
+}
+
+func (e ErrOutOfFiles) Error() string {
+	return "No more files"
+}
 
 type PcapFileList struct {
 	Files          []string
@@ -36,11 +46,26 @@ type PcapFileList struct {
 	TimestampIndex int
 }
 
-type ErrOutOfFiles struct {
-}
-
-func (e ErrOutOfFiles) Error() string {
-	return "No more files"
+func NewPcapFileList(dname string, event Event, fileFormat string) *PcapFileList {
+	pl := new(PcapFileList)
+	pl.DirName = dname
+	pl.buildPcapNameParsing(fileFormat)
+	if len(event.CaptureFile) > 0 {
+		fullName := path.Join(dname, event.CaptureFile)
+		pl.Files = append(pl.Files, fullName)
+		err := pl.buildPcapList()
+		if err != nil {
+			return nil
+		}
+		pl.FileName = event.CaptureFile
+	} else {
+		logrus.Debug("Scanning will start soon")
+		err := pl.buildFullPcapList()
+		if err != nil {
+			return nil
+		}
+	}
+	return pl
 }
 
 /* Suricata supports following expansion
@@ -75,28 +100,6 @@ func (pl *PcapFileList) buildPcapNameParsing(fileFormat string) {
 	pl.FileParsing = regexp.MustCompile(regexpString)
 }
 
-func NewPcapFileList(dname string, event Event, fileFormat string) *PcapFileList {
-	pl := new(PcapFileList)
-	pl.DirName = dname
-	pl.buildPcapNameParsing(fileFormat)
-	if len(event.CaptureFile) > 0 {
-		fullName := path.Join(dname, event.CaptureFile)
-		pl.Files = append(pl.Files, fullName)
-		err := pl.buildPcapList()
-		if err != nil {
-			return nil
-		}
-		pl.FileName = event.CaptureFile
-	} else {
-		logrus.Debug("Scanning will start soon")
-		err := pl.buildFullPcapList()
-		if err != nil {
-			return nil
-		}
-	}
-	return pl
-}
-
 func (pl *PcapFileList) GetNext() (string, error) {
 	if pl.Index < len(pl.Files) {
 		pfile := pl.Files[pl.Index]
@@ -126,7 +129,8 @@ func (pl *PcapFileList) buildPcapList() error {
 			logrus.Warning("Can't parse integer")
 		}
 	}
-	timestamp, err := strconv.ParseInt(match[pl.TimestampIndex], 10, 64)
+	timestampValue, err := strconv.ParseInt(match[pl.TimestampIndex], 10, 64)
+	timestamp := time.Unix(timestampValue, 0)
 	if err != nil {
 		logrus.Warning("Can't parse integer")
 		return errors.New("Invalid timestamp in file name")
@@ -147,16 +151,19 @@ func (pl *PcapFileList) buildPcapList() error {
 			lThreadIndex, err := strconv.ParseInt(lMatch[pl.ThreadIndex], 10, 64)
 			if err != nil {
 				logrus.Warning("Can't parse integer")
+				continue
 			}
 			if lThreadIndex != threadIndex {
 				continue
 			}
 		}
-		lTimestamp, err := strconv.ParseInt(lMatch[pl.TimestampIndex], 10, 64)
+		lTimestampValue, err := strconv.ParseInt(lMatch[pl.TimestampIndex], 10, 64)
+		lTimestamp := time.Unix(lTimestampValue, 0)
 		if err != nil {
 			logrus.Warning("Can't parse integer")
+			continue
 		}
-		if lTimestamp > timestamp {
+		if timestamp.Before(lTimestamp) {
 			logrus.Infof("Adding file %s", file.Name())
 			pl.Files = append(pl.Files, path.Join(dName, file.Name()))
 		} else {
@@ -170,8 +177,7 @@ func (pl *PcapFileList) buildFullPcapList() error {
 	logrus.Debugf("Scanning directory: %s", pl.DirName)
 	files, err := ioutil.ReadDir(pl.DirName)
 	if err != nil {
-		logrus.Warningf("Can't open directory %s: %s", pl.DirName, err)
-		return errors.New("Can't open directory")
+		return fmt.Errorf("Can't open directory %s: %s", pl.DirName, err)
 	}
 	for _, file := range files {
 		lMatch := pl.FileParsing.FindStringSubmatch(file.Name())

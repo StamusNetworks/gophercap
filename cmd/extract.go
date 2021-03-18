@@ -39,7 +39,9 @@ gopherCap extract \
 	--skip-bpf
 `,
 	Run: func(cmd *cobra.Command, args []string) {
-		if err := extract.ExtractPcapFile(viper.GetString("extract.dir.pcap"), viper.GetString("extract.dump.pcap"), viper.GetString("extract.event"), viper.GetBool("extract.skip.bpf"), viper.GetString("extract.file.format")); err != nil {
+		if err := extract.ExtractPcapFile(viper.GetString("extract.dir.pcap"),
+			viper.GetString("extract.dump.pcap"), viper.GetString("extract.event"),
+			viper.GetBool("extract.skip.bpf"), viper.GetString("extract.file.format")); err != nil {
 			logrus.Fatal(err)
 		}
 	},
