@@ -25,6 +25,14 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// FlowPair holds IP and Transport layers for an event
+type FlowPair struct {
+	// IP is the Flow containing data
+	IP *gopacket.Flow
+	// Transport is the Flow of the tunnel
+	Transport *gopacket.Flow
+}
+
 func buildBPF(event Event) (string, error) {
 	proto := event.Proto
 	srcIp := event.SrcIP
@@ -61,7 +69,7 @@ func buildBPF(event Event) (string, error) {
 	return bpfFilter, nil
 }
 
-func buildEndpoints(event Event) (gopacket.Flow, gopacket.Flow, error) {
+func buildEndpoints(event Event) (*FlowPair, error) {
 	srcIPEndpoint := layers.NewIPEndpoint(event.SrcIP.IP)
 	destIPEndpoint := layers.NewIPEndpoint(event.DestIP.IP)
 	IPFlow, err := gopacket.FlowFromEndpoints(srcIPEndpoint, destIPEndpoint)
@@ -82,24 +90,24 @@ func buildEndpoints(event Event) (gopacket.Flow, gopacket.Flow, error) {
 		srcEndpoint = layers.NewSCTPPortEndpoint(layers.SCTPPort(event.SrcPort))
 		destEndpoint = layers.NewSCTPPortEndpoint(layers.SCTPPort(event.DestPort))
 	default:
-		return IPFlow, gopacket.InvalidFlow, errors.New("Unsupported protocol " + event.Proto)
+		return &FlowPair{IP: &IPFlow, Transport: &gopacket.InvalidFlow}, errors.New("Unsupported protocol " + event.Proto)
 	}
 
 	transportFlow, err := gopacket.FlowFromEndpoints(srcEndpoint, destEndpoint)
 	if err != nil {
 		logrus.Error("Can not create transport Flow", err)
 	}
-	return IPFlow, transportFlow, err
+	return &FlowPair{IP: &IPFlow, Transport: &transportFlow}, err
 }
 
-func filterTunnel(data []byte, IPFlow gopacket.Flow, transportFlow gopacket.Flow, event Event) bool {
+func filterTunnel(data []byte, eventFLowPair FlowPair, event Event) bool {
 	packet := gopacket.NewPacket(data, layers.LayerTypeEthernet, gopacket.Lazy)
 	switch event.Proto {
 	case "TCP":
 		tcpLayer := packet.Layer(layers.LayerTypeTCP)
 		if tcpLayer != nil {
 			tcp, _ := tcpLayer.(*layers.TCP)
-			if tcp.TransportFlow() == transportFlow || tcp.TransportFlow() == transportFlow.Reverse() {
+			if tcp.TransportFlow() == *eventFLowPair.Transport || tcp.TransportFlow() == eventFLowPair.Transport.Reverse() {
 				/* TODO handle depth > 1 */
 				networkLayer := packet.NetworkLayer()
 				if event.Tunnel.Depth > 0 {
@@ -116,7 +124,7 @@ func filterTunnel(data []byte, IPFlow gopacket.Flow, transportFlow gopacket.Flow
 					networkLayer = actualPacket.NetworkLayer()
 				}
 				nFlow := networkLayer.NetworkFlow()
-				if nFlow == IPFlow || nFlow == IPFlow.Reverse() {
+				if nFlow == *eventFLowPair.IP || nFlow == eventFLowPair.IP.Reverse() {
 					return true
 				}
 			}
@@ -126,7 +134,7 @@ func filterTunnel(data []byte, IPFlow gopacket.Flow, transportFlow gopacket.Flow
 		/* TODO handle tunnel in UDP */
 		if udpLayer != nil {
 			udp, _ := udpLayer.(*layers.UDP)
-			if udp.TransportFlow() == transportFlow || udp.TransportFlow() == transportFlow.Reverse() {
+			if udp.TransportFlow() == *eventFLowPair.Transport || udp.TransportFlow() == eventFLowPair.Transport.Reverse() {
 				return true
 			}
 		}
@@ -135,7 +143,7 @@ func filterTunnel(data []byte, IPFlow gopacket.Flow, transportFlow gopacket.Flow
 		/* TODO handle tunnel in SCTP */
 		if sctpLayer != nil {
 			sctp, _ := sctpLayer.(*layers.SCTP)
-			if sctp.TransportFlow() == transportFlow || sctp.TransportFlow() == transportFlow.Reverse() {
+			if sctp.TransportFlow() == *eventFLowPair.Transport || sctp.TransportFlow() == eventFLowPair.Transport.Reverse() {
 				return true
 			}
 		}
