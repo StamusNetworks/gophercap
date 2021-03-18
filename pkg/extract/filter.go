@@ -119,6 +119,7 @@ func filterTunnel(data []byte, eventFLowPair FlowPair, event Event) bool {
 						tLayer = packet.Layer(layers.LayerTypeVXLAN)
 					default:
 						logrus.Error("Unsupported tunnel type: " + event.Tunnel.Proto)
+						return false
 					}
 					actualPacket := gopacket.NewPacket(tLayer.LayerPayload(), layers.LayerTypeIPv4, gopacket.Lazy)
 					networkLayer = actualPacket.NetworkLayer()
