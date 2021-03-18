@@ -19,7 +19,6 @@ package extract
 import (
 	"errors"
 	"fmt"
-	"net"
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
@@ -63,8 +62,8 @@ func buildBPF(event Event) (string, error) {
 }
 
 func buildEndpoints(event Event) (gopacket.Flow, gopacket.Flow, error) {
-	srcIPEndpoint := layers.NewIPEndpoint(net.ParseIP(event.SrcIP))
-	destIPEndpoint := layers.NewIPEndpoint(net.ParseIP(event.DestIP))
+	srcIPEndpoint := layers.NewIPEndpoint(event.SrcIP.IP)
+	destIPEndpoint := layers.NewIPEndpoint(event.DestIP.IP)
 	IPFlow, err := gopacket.FlowFromEndpoints(srcIPEndpoint, destIPEndpoint)
 	if err != nil {
 		logrus.Error("Can not create IP Flow: ", err)

@@ -18,10 +18,13 @@ package extract
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"io/ioutil"
+	"net"
 	"os"
 	"path"
+	"strconv"
 	"time"
 
 	"encoding/json"
@@ -42,9 +45,27 @@ func writePacket(handle *pcap.Handle, buf []byte) error {
 	return nil
 }
 
+// IPAddr is for decoding IP values directly to IP objects during JSON decode. net.IP is a wrapper
+// around byte array, not integer, so it also handles IPv6 addresses.
+type IPAddr struct{ net.IP }
+
+// UnmarshalJSON implements json.Unmarshaler
+func (t *IPAddr) UnmarshalJSON(b []byte) error {
+	str, err := strconv.Unquote(string(b))
+	if err != nil {
+		return err
+	}
+	ip := net.ParseIP(str)
+	if ip == nil {
+		return fmt.Errorf("Invalid IP: %s", string(b))
+	}
+	t.IP = ip
+	return nil
+}
+
 type Tunnel struct {
-	SrcIP    string `json:"src_ip"`
-	DestIP   string `json:"dest_ip"`
+	SrcIP    IPAddr `json:"src_ip"`
+	DestIP   IPAddr `json:"dest_ip"`
 	SrcPort  uint16 `json:"src_port"`
 	DestPort uint16 `json:"dest_port"`
 	Proto    string `json:"proto"`
@@ -54,8 +75,8 @@ type Tunnel struct {
 type Event struct {
 	Timestamp   string
 	CaptureFile string `json:"capture_file"`
-	SrcIP       string `json:"src_ip"`
-	DestIP      string `json:"dest_ip"`
+	SrcIP       IPAddr `json:"src_ip"`
+	DestIP      IPAddr `json:"dest_ip"`
 	SrcPort     uint16 `json:"src_port"`
 	DestPort    uint16 `json:"dest_port"`
 	AppProto    string `json:"app_proto"`
