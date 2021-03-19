@@ -102,12 +102,20 @@ func openPcapReaderHandle(fName string, bpfFilter string) (*pcap.Handle, error) 
 	return handleRead, nil
 }
 
+type ExtractPcapConfig struct {
+	PcapLogDirectory string
+	OutputName       string
+	EventPath        string
+	FileFormat       string
+	SkipBpf          bool
+}
+
 /*
 Extract a pcap file for a given flow
 */
-func ExtractPcapFile(dName string, oName string, eventPath string, skipBpf bool, fileFormat string) error {
+func ExtractPcapFile(config ExtractPcapConfig) error {
 	/* open event file */
-	eventFile, err := os.Open(eventPath)
+	eventFile, err := os.Open(config.EventPath)
 	if err != nil {
 		return err
 	}
@@ -121,11 +129,11 @@ func ExtractPcapFile(dName string, oName string, eventPath string, skipBpf bool,
 	var event Event
 	err = json.Unmarshal(eventPathstring, &event)
 	if err != nil {
-		return errors.New("Can't parse JSON in " + eventPath)
+		return errors.New("Can't parse JSON in " + config.EventPath)
 	}
 
 	if len(event.CaptureFile) > 0 {
-		filename := path.Join(dName, event.CaptureFile)
+		filename := path.Join(config.PcapLogDirectory, event.CaptureFile)
 		_, err := os.Stat(filename)
 		if os.IsNotExist(err) {
 			return err
@@ -142,13 +150,13 @@ func ExtractPcapFile(dName string, oName string, eventPath string, skipBpf bool,
 		return err
 	}
 
-	pcapFileList := NewPcapFileList(dName, event, fileFormat)
+	pcapFileList := NewPcapFileList(config.PcapLogDirectory, event, config.FileFormat)
 	if pcapFileList == nil {
 		return errors.New("Problem when building pcap file list")
 	}
 
 	bpfFilter := ""
-	if skipBpf != true {
+	if config.SkipBpf != true {
 		bpfFilter, err = buildBPF(event)
 		if err != nil {
 			logrus.Warning(err)
@@ -156,7 +164,7 @@ func ExtractPcapFile(dName string, oName string, eventPath string, skipBpf bool,
 	}
 
 	// Open up a second pcap handle for packet writes.
-	outfile, err := os.Create(oName)
+	outfile, err := os.Create(config.OutputName)
 	if err != nil {
 		logrus.Error("Can't open pcap output file: ", err)
 		return err
@@ -212,7 +220,7 @@ func ExtractPcapFile(dName string, oName string, eventPath string, skipBpf bool,
 			case err != nil:
 				logrus.Warningf("Failed to read packet %d: %s\n", pktCount, err)
 			default:
-				if skipBpf == true || event.Tunnel.Depth > 0 {
+				if config.SkipBpf == true || event.Tunnel.Depth > 0 {
 					if filterTunnel(data, *eventFlowPair, event) {
 						handleWrite.WritePacket(ci, data)
 						pktCount++
