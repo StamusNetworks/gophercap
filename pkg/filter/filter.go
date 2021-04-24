@@ -2,7 +2,6 @@ package filter
 
 import (
 	"bufio"
-	"compress/gzip"
 	"errors"
 	"fmt"
 	"io"
@@ -163,6 +162,8 @@ func ReadAndFilterNetworks(c *Config) error {
 		c.PktFunc = DefaultPktFunc
 	}
 	var count int64
+	var skipped int64
+	var total float64
 
 	f, err := os.Open(c.InFile)
 	if err != nil {
@@ -172,18 +173,18 @@ func ReadAndFilterNetworks(c *Config) error {
 
 	input, err := pcapgo.NewReader(bufio.NewReader(f))
 	if err != nil {
-		return err
+		return fmt.Errorf("infile open: %s", err)
 	}
+	input.SetSnaplen(1024 * 64)
 
 	output, err := os.Create(c.OutFile + ".gz")
 	if err != nil {
-		return err
+		return fmt.Errorf("outfile create: %s", err)
 	}
 	defer output.Close()
 
 	logrus.Infof("writing %s snaplen %d\n", c.OutFile+".gz", input.Snaplen())
 
-	gzip.NewWriter(output)
 	w := pcapgo.NewWriter(output)
 	w.WriteFileHeader(uint32(input.Snaplen()), input.LinkType())
 
@@ -195,25 +196,33 @@ loop:
 		select {
 		case <-report.C:
 			logrus.Debugf(
-				"Worker %d processed %d packets at %.2f",
-				c.ID, count, float64(count)/time.Since(start).Seconds(),
+				"Worker %d processed: %d, skipped: %d rate: %.2f",
+				c.ID, count, skipped, total/time.Since(start).Seconds(),
 			)
 		default:
 		}
+		total++
 
-		raw, _, err := input.ReadPacketData()
+		raw, ci, err := input.ReadPacketData()
 		if err != nil && err == io.EOF {
 			break loop
 		} else if err != nil {
-			return err
+			logrus.Warnf("Packet read: %s - %s - %d", c.InFile, err, ci.CaptureLength)
 		}
-		packet := gopacket.NewPacket(raw, input.LinkType(), gopacket.Lazy)
+		packet := gopacket.NewPacket(raw, input.LinkType(), gopacket.Default)
 		if c.PktFunc(packet, w, c.Filter) {
 			count++
+		} else {
+			skipped++
 		}
 	}
 
-	logrus.Infof("%s wrote %d packets", c.OutFile, count)
+	logrus.Infof(
+		"%s wrote: %d, skipped: %d",
+		c.OutFile,
+		count,
+		skipped,
+	)
 	return nil
 }
 
