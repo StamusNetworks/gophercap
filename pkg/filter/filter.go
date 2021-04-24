@@ -1,15 +1,18 @@
 package filter
 
 import (
+	"bufio"
+	"compress/gzip"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
-	"github.com/google/gopacket/pcap"
 	"github.com/google/gopacket/pcapgo"
 	"github.com/sirupsen/logrus"
 )
@@ -137,6 +140,7 @@ func DecapPktFunc(pkt gopacket.Packet, w *pcapgo.Writer, bpfNet BPFNet) bool {
 
 // Config holds params needed by ReadAndFilterNetworks
 type Config struct {
+	ID int
 	// Full path for input and otput PCAP files
 	InFile, OutFile string
 	// BPF filter object, only packets matching network list will be written to OutFile
@@ -159,35 +163,56 @@ func ReadAndFilterNetworks(c *Config) error {
 		c.PktFunc = DefaultPktFunc
 	}
 	var count int64
-	input, err := pcap.OpenOffline(c.InFile)
+
+	f, err := os.Open(c.InFile)
 	if err != nil {
 		return err
 	}
-	defer input.Close()
+	defer f.Close()
 
-	if !c.DisableNativeBPF {
-		if err := input.SetBPFFilter(c.Filter.String()); err != nil {
-			return err
-		}
+	input, err := pcapgo.NewReader(bufio.NewReader(f))
+	if err != nil {
+		return err
 	}
 
-	packetSource := gopacket.NewPacketSource(input, input.LinkType())
-
-	output, err := os.Create(c.OutFile)
+	output, err := os.Create(c.OutFile + ".gz")
 	if err != nil {
 		return err
 	}
 	defer output.Close()
 
-	logrus.Infof("writing %s snaplen %d\n", c.OutFile, input.SnapLen())
-	w := pcapgo.NewWriter(output)
-	w.WriteFileHeader(uint32(input.SnapLen()), input.LinkType())
+	logrus.Infof("writing %s snaplen %d\n", c.OutFile+".gz", input.Snaplen())
 
-	for packet := range packetSource.Packets() {
+	gzip.NewWriter(output)
+	w := pcapgo.NewWriter(output)
+	w.WriteFileHeader(uint32(input.Snaplen()), input.LinkType())
+
+	report := time.NewTicker(5 * time.Second)
+	start := time.Now()
+
+loop:
+	for {
+		select {
+		case <-report.C:
+			logrus.Debugf(
+				"Worker %d processed %d packets at %.2f",
+				c.ID, count, float64(count)/time.Since(start).Seconds(),
+			)
+		default:
+		}
+
+		raw, _, err := input.ReadPacketData()
+		if err != nil && err == io.EOF {
+			break loop
+		} else if err != nil {
+			return err
+		}
+		packet := gopacket.NewPacket(raw, input.LinkType(), gopacket.Lazy)
 		if c.PktFunc(packet, w, c.Filter) {
 			count++
 		}
 	}
+
 	logrus.Infof("%s wrote %d packets", c.OutFile, count)
 	return nil
 }

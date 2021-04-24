@@ -95,6 +95,7 @@ var filterCmd = &cobra.Command{
 						OutFile:          task.Output,
 						Filter:           task.Filter,
 						PktFunc:          filter.DecapPktFunc,
+						ID:               id,
 						DisableNativeBPF: true,
 					}); err != nil {
 						logrus.Error(err)
