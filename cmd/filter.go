@@ -98,7 +98,7 @@ var filterCmd = &cobra.Command{
 						ID:               id,
 						DisableNativeBPF: true,
 					}); err != nil {
-						logrus.Error(task.Input, err)
+						logrus.Error(task.Input, " ", err)
 						continue loop
 					}
 				}
