@@ -2,6 +2,7 @@ package filter
 
 import (
 	"bufio"
+	"compress/gzip"
 	"errors"
 	"fmt"
 	"io"
@@ -182,10 +183,11 @@ func ReadAndFilterNetworks(c *Config) error {
 		return fmt.Errorf("outfile create: %s", err)
 	}
 	defer output.Close()
+	gw := gzip.NewWriter(output)
 
 	logrus.Infof("writing %s snaplen %d\n", c.OutFile+".gz", input.Snaplen())
 
-	w := pcapgo.NewWriter(output)
+	w := pcapgo.NewWriter(gw)
 	w.WriteFileHeader(uint32(input.Snaplen()), input.LinkType())
 
 	report := time.NewTicker(5 * time.Second)
