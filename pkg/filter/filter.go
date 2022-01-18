@@ -55,7 +55,7 @@ func (b BPFNet) Contains(ip net.IP) bool {
 
 // NewBPFNet initializes a new BPFNet object from a list of networks and a logic joiner requirement
 func NewBPFNet(nets []string, join BPFLogicGate) (*BPFNet, error) {
-	if nets == nil || len(nets) == 0 {
+	if len(nets) == 0 {
 		return nil, errors.New("Missing network list")
 	}
 	parsedNets := make([]net.IPNet, len(nets))
