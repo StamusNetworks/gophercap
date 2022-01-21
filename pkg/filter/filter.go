@@ -43,6 +43,7 @@ type FilterResult struct {
 	Skipped     int
 	Start       time.Time
 	Took        time.Duration
+	Rate        string
 }
 
 /*
@@ -92,6 +93,8 @@ loop:
 	for {
 		select {
 		case <-report.C:
+			res.Took = time.Since(res.Start)
+			res.Rate = fmt.Sprintf("%.2f pps", float64(res.Count)/res.Took.Seconds())
 			if c.StatFunc != nil {
 				c.StatFunc(*res)
 			}
