@@ -2,17 +2,20 @@ package filter
 
 import (
 	"errors"
+	"fmt"
 	"net"
+	"strconv"
+	"strings"
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 )
 
-type ConditionKind int
+type FilterKind int
 
 const (
-	ConditionKindTCP ConditionKind = iota
-	ConditionKindUDP
+	FilterKindSubnet FilterKind = iota
+	FilterKindPortTCP
 )
 
 // Matcher is for filtering packets
@@ -59,17 +62,31 @@ func (cs ConditionSubnet) match(ip net.IP) bool {
 	return false
 }
 
-func NewPortMatcher(k ConditionKind, p ...uint16) *ConditionEndpoint {
+func NewPortMatcher(p []string) (*ConditionEndpoint, error) {
 	vals := make(map[gopacket.Endpoint]bool)
-	for _, port := range p {
-		switch k {
-		case ConditionKindTCP:
+	for _, raw := range p {
+		bits := strings.Split(raw, "/")
+		if len(bits) != 2 {
+			return nil, fmt.Errorf("%s not valid port format, should be <number>/<tcp/udp>", raw)
+		}
+		port, err := strconv.Atoi(bits[0])
+		if err != nil {
+			return nil, err
+		}
+		switch bits[1] {
+		case "tcp":
 			vals[layers.NewTCPPortEndpoint(layers.TCPPort(port))] = true
-		case ConditionKindUDP:
+		case "udp":
 			vals[layers.NewUDPPortEndpoint(layers.UDPPort(port))] = true
+		default:
+			return nil, fmt.Errorf(
+				"protocol def invalid for %s, got %s, expected tcp or udp",
+				raw,
+				bits[1],
+			)
 		}
 	}
-	return &ConditionEndpoint{Values: vals}
+	return &ConditionEndpoint{Values: vals}, nil
 }
 
 type ConditionEndpoint struct {
