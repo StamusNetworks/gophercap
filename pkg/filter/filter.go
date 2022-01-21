@@ -102,7 +102,7 @@ loop:
 		}
 		res.Count++
 
-		raw, _, err := input.ReadPacketData()
+		raw, ci, err := input.ReadPacketData()
 		if err != nil && err == io.EOF {
 			break loop
 		} else if err != nil {
@@ -117,9 +117,11 @@ loop:
 				continue loop
 			}
 		}
+		ci.CaptureLength = len(pkt.Data())
+		pkt.Metadata().CaptureInfo = ci
 		if c.Filter.Match(pkt) {
 			if err := w.WritePacket(pkt.Metadata().CaptureInfo, pkt.Data()); err != nil {
-				res.Errors++
+				return res, err
 			}
 			res.Matched++
 		} else {
