@@ -135,5 +135,6 @@ loop:
 type Task struct {
 	Input, Output string
 
-	Filter Matcher
+	Filter      Matcher
+	Description string
 }
