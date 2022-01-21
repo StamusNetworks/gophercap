@@ -18,11 +18,13 @@ package cmd
 
 import (
 	"errors"
+	"fmt"
 	"gopherCap/pkg/filter"
 	"gopherCap/pkg/fs"
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	"github.com/sirupsen/logrus"
@@ -64,19 +66,34 @@ var filterCmd = &cobra.Command{
 		if err != nil {
 			logrus.Fatalf("Filter input read: %s", err)
 		}
-
-		var rawFilter map[string][]string
-		if err := yaml.Unmarshal(data, &rawFilter); err != nil {
-			logrus.Fatalf("Filter YAML parse: %s", err)
+		var cfg filter.ConfigFileInput
+		if err := yaml.Unmarshal(data, &cfg); err != nil {
+			logrus.Fatal(err)
 		}
 
-		filters := make(filter.BPFNetMap)
-		for key, networks := range rawFilter {
-			parsed, err := filter.NewBPFNet(networks, filter.BPFOr)
-			if err != nil {
-				logrus.Fatal(err)
+		filters := make(map[string]filter.Matcher)
+		for name, conditions := range cfg {
+			switch filter.NewFilterKind(viper.GetString("filter.kind")) {
+			case filter.FilterKindSubnet:
+				matcher, err := filter.NewConditionalSubnet(conditions)
+				if err != nil {
+					logrus.Fatal(err)
+				}
+				filters[name] = matcher
+			case filter.FilterKindPort:
+				matcher, err := filter.NewPortMatcher(conditions)
+				if err != nil {
+					logrus.Fatal(err)
+				}
+				filters[name] = matcher
+			default:
+				logrus.Fatalf(
+					"invalid filter kind %s, expected %s",
+					viper.GetString("filter.kind"),
+					strings.Join(filter.FilterKinds, ", "),
+				)
 			}
-			filters[key] = *parsed
+
 		}
 
 		tasks := make(chan filter.Task, workers)
@@ -88,19 +105,31 @@ var filterCmd = &cobra.Command{
 				logrus.Infof("Worker %d started", id)
 				defer wg.Done()
 				defer logrus.Infof("Worker %d done", id)
-			loop:
 				for task := range tasks {
-					if err := filter.ReadAndFilterNetworks(&filter.Config{
-						InFile:           task.Input,
-						OutFile:          task.Output,
-						Filter:           task.Filter,
-						PktFunc:          filter.DecapPktFunc,
-						ID:               id,
-						DisableNativeBPF: true,
-					}); err != nil {
-						logrus.Error(task.Input, " ", err)
-						continue loop
+					logrus.WithFields(logrus.Fields{
+						"input":  task.Input,
+						"output": task.Output,
+						"desc":   task.Description,
+					}).Info("Filtering file")
+					result, err := filter.ReadAndFilter(&filter.Config{
+						File: struct {
+							Input  string
+							Output string
+						}{
+							Input:  task.Input,
+							Output: task.Output,
+						},
+						Filter:      task.Filter,
+						Decapsulate: true,
+						Compress:    true,
+						StatFunc: func(fr filter.FilterResult) {
+							logrus.Debugf("%+v", fr)
+						},
+					})
+					if err != nil {
+						logrus.Error(err)
 					}
+					logrus.Infof("%+v", result)
 				}
 			}(i)
 		}
@@ -110,8 +139,8 @@ var filterCmd = &cobra.Command{
 			logrus.Fatalf("PCAP list gen: %s", err)
 		}
 
-		for _, pcapFile := range files {
-			for name, bpfGenerator := range filters {
+		for _, fn := range files {
+			for name, matcher := range filters {
 				outDir := filepath.Join(output, name)
 				stat, err := os.Stat(outDir)
 				if os.IsNotExist(err) {
@@ -122,11 +151,11 @@ var filterCmd = &cobra.Command{
 					logrus.Fatalf("Output path %s exists and is not a directory", output)
 				}
 
-				outPCAP := filepath.Join(outDir, filepath.Base(pcapFile.Path))
 				tasks <- filter.Task{
-					Input:  pcapFile.Path,
-					Output: outPCAP,
-					Filter: bpfGenerator,
+					Input:       fn.Path,
+					Output:      filepath.Join(outDir, filepath.Base(fn.Path)),
+					Filter:      matcher,
+					Description: name,
 				}
 			}
 		}
@@ -153,4 +182,11 @@ func init() {
 
 	filterCmd.PersistentFlags().String("filter-output", "", `Output folder for filtered PCAP files.`)
 	viper.BindPFlag("filter.output", filterCmd.PersistentFlags().Lookup("filter-output"))
+
+	filterCmd.PersistentFlags().String(
+		"filter-kind",
+		filter.FilterKinds[0],
+		fmt.Sprintf("Select filtering modes. Supported are %s", strings.Join(filter.FilterKinds, ",")),
+	)
+	viper.BindPFlag("filter.kind", filterCmd.PersistentFlags().Lookup("filter-kind"))
 }
