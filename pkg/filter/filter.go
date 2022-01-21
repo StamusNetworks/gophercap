@@ -12,6 +12,8 @@ import (
 	"github.com/google/gopacket/pcapgo"
 )
 
+type ConfigFileInput map[string][]string
+
 // Config holds params needed by ReadAndFilterNetworks
 type Config struct {
 	ID int
