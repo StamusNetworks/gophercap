@@ -33,5 +33,5 @@ func DecapGREandERSPAN(pkt gopacket.Packet) (gopacket.Packet, error) {
 	if inner == nil || inner.NetworkLayer() == nil {
 		return pkt, errors.New("unable to build inner packet")
 	}
-	return pkt, nil
+	return inner, nil
 }
