@@ -90,7 +90,7 @@ func DefaultPktFunc(pkt gopacket.Packet, w *pcapgo.Writer, bpfNet BPFNet) bool {
 	return true
 }
 
-func FilteredPktFunc(pkt gopacket.Packet, w *pcapgo.Writer, bpfNet BPFNet) bool {
+func FilterSubnetFunc(pkt gopacket.Packet, w *pcapgo.Writer, bpfNet BPFNet) bool {
 	src, dest := pkt.NetworkLayer().NetworkFlow().Endpoints()
 	srcIP := net.ParseIP(src.String())
 	destIP := net.ParseIP(dest.String())
@@ -135,7 +135,7 @@ func DecapPktFunc(pkt gopacket.Packet, w *pcapgo.Writer, bpfNet BPFNet) bool {
 	if inner == nil || inner.NetworkLayer() == nil {
 		return false
 	}
-	return FilteredPktFunc(inner, w, bpfNet)
+	return FilterSubnetFunc(inner, w, bpfNet)
 }
 
 // Config holds params needed by ReadAndFilterNetworks
@@ -154,13 +154,12 @@ type Config struct {
 }
 
 /*
-ReadAndFilterNetworks is a simple function that takes filter packets matching BPF filter from input file
-to output file.
+ReadAndFilter processes a PCAP file, storing packets that match filtering
+criteria in output file
 */
-func ReadAndFilterNetworks(c *Config) error {
+func ReadAndFilter(c *Config) error {
 	if c.PktFunc == nil {
-		logrus.Warn("Packet handling function undefined, using default")
-		c.PktFunc = DefaultPktFunc
+		return errors.New("packet filtering function undefined")
 	}
 	var count int64
 	var skipped int64
