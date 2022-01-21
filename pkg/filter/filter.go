@@ -27,10 +27,7 @@ type Config struct {
 	// Enable GRE and ERSPAN packet decapsulation
 	Decapsulate bool
 
-	Compress struct {
-		Input  bool
-		Output bool
-	}
+	Compress bool
 
 	StatFunc func(FilterResult)
 }
@@ -65,7 +62,7 @@ func ReadAndFilter(c *Config) (*FilterResult, error) {
 
 	var writer io.Writer
 	fp := c.File.Output
-	if c.Compress.Output {
+	if c.Compress {
 		fp += ".gz"
 	}
 	output, err := os.Create(fp)
@@ -74,7 +71,7 @@ func ReadAndFilter(c *Config) (*FilterResult, error) {
 	}
 	defer output.Close()
 
-	if c.Compress.Output {
+	if c.Compress {
 		gw := gzip.NewWriter(output)
 		defer gw.Close()
 		writer = gw
