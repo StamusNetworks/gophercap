@@ -26,10 +26,6 @@ type Config struct {
 	Filter Matcher
 	// Enable GRE and ERSPAN packet decapsulation
 	Decapsulate bool
-	// Optionally disable native libpcap BPF call
-	// Use this when callaing DecapPktFunc
-	// BPF would otherwise filter all transport packets that have wrong IP
-	DisableNativeBPF bool
 
 	Compress struct {
 		Input  bool
