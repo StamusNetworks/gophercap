@@ -14,9 +14,25 @@ import (
 type FilterKind int
 
 const (
-	FilterKindSubnet FilterKind = iota
-	FilterKindPortTCP
+	FilterKindUndefined FilterKind = iota
+	FilterKindSubnet
+	FilterKindPort
 )
+
+var FilterKinds = []string{
+	"subnet", "port",
+}
+
+func NewFilterKind(raw string) FilterKind {
+	switch raw {
+	case FilterKinds[0]:
+		return FilterKindSubnet
+	case FilterKinds[1]:
+		return FilterKindPort
+	default:
+		return FilterKindUndefined
+	}
+}
 
 // Matcher is for filtering packets
 type Matcher interface {
