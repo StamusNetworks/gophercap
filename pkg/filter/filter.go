@@ -120,7 +120,7 @@ func DecapPktFunc(pkt gopacket.Packet, w *pcapgo.Writer, bpfNet BPFNet) bool {
 	}
 	// Did not find any tunnel layers, assume no decap nor custom filtering is needed
 	if startLayer == 0 {
-		return DefaultPktFunc(pkt, w, bpfNet)
+		return FilterSubnetFunc(pkt, w, bpfNet)
 	}
 	// paranoia check
 	if startLayer == len(pkt.Layers())-1 {
