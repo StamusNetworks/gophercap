@@ -139,7 +139,7 @@ var filterCmd = &cobra.Command{
 							StatFunc: func(fr filter.FilterResult) {
 								logrus.Debugf("%+v", fr)
 							},
-            Ctx: ctx,
+							Ctx: ctx,
 						})
 						if err != nil {
 							switch err.(type) {

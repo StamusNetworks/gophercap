@@ -3,6 +3,7 @@ package filter
 import (
 	"bufio"
 	"compress/gzip"
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -11,6 +12,10 @@ import (
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/pcapgo"
 )
+
+type ErrEarlyExit struct{}
+
+func (e ErrEarlyExit) Error() string { return "early exit" }
 
 type ConfigFileInput map[string][]string
 
@@ -30,6 +35,8 @@ type Config struct {
 	Compress bool
 
 	StatFunc func(FilterResult)
+
+	Ctx context.Context
 }
 
 type FilterResult struct {
@@ -86,9 +93,18 @@ func ReadAndFilter(c *Config) (*FilterResult, error) {
 
 	res := &FilterResult{Start: time.Now()}
 
+	var ctx context.Context
+	if c.Ctx == nil {
+		ctx = context.Background()
+	} else {
+		ctx = c.Ctx
+	}
+
 loop:
 	for {
 		select {
+		case <-ctx.Done():
+			return res, ErrEarlyExit{}
 		case <-report.C:
 			res.Took = time.Since(res.Start)
 			res.Rate = fmt.Sprintf("%.2f pps", float64(res.Count)/res.Took.Seconds())
