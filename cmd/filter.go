@@ -17,12 +17,14 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 package cmd
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"gopherCap/pkg/filter"
 	"gopherCap/pkg/fs"
 	"io/ioutil"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -97,42 +99,73 @@ var filterCmd = &cobra.Command{
 		}
 
 		tasks := make(chan filter.Task, workers)
+		stoppers := make([]context.CancelFunc, workers)
 
 		var wg sync.WaitGroup
 		for i := 0; i < workers; i++ {
 			wg.Add(1)
-			go func(id int) {
+			ctx, stop := context.WithCancel(context.Background())
+			stoppers[i] = stop
+			go func(id int, ctx context.Context) {
 				logrus.Infof("Worker %d started", id)
 				defer wg.Done()
 				defer logrus.Infof("Worker %d done", id)
-				for task := range tasks {
-					logrus.WithFields(logrus.Fields{
-						"input":  task.Input,
-						"output": task.Output,
-						"desc":   task.Description,
-					}).Info("Filtering file")
-					result, err := filter.ReadAndFilter(&filter.Config{
-						File: struct {
-							Input  string
-							Output string
-						}{
-							Input:  task.Input,
-							Output: task.Output,
-						},
-						Filter:      task.Filter,
-						Decapsulate: viper.GetBool("filter.decap"),
-						Compress:    viper.GetBool("filter.compress"),
-						StatFunc: func(fr filter.FilterResult) {
-							logrus.Debugf("%+v", fr)
-						},
-					})
-					if err != nil {
-						logrus.Error(err)
+			loop:
+				for {
+					select {
+					case <-ctx.Done():
+						logrus.WithField("worker", id).Warn("early exit called")
+						break loop
+					case task, ok := <-tasks:
+						if !ok {
+							break loop
+						}
+						logrus.WithFields(logrus.Fields{
+							"input":  task.Input,
+							"output": task.Output,
+							"desc":   task.Description,
+						}).Info("Filtering file")
+						result, err := filter.ReadAndFilter(&filter.Config{
+							File: struct {
+								Input  string
+								Output string
+							}{
+								Input:  task.Input,
+								Output: task.Output,
+							},
+							Filter:      task.Filter,
+							Decapsulate: viper.GetBool("filter.decap"),
+							Compress:    viper.GetBool("filter.compress"),
+							StatFunc: func(fr filter.FilterResult) {
+								logrus.Debugf("%+v", fr)
+							},
+            Ctx: ctx,
+						})
+						if err != nil {
+							switch err.(type) {
+							case filter.ErrEarlyExit:
+								logrus.WithField("worker", id).Warn("early exit called")
+								break loop
+							default:
+								logrus.Error(err)
+							}
+						}
+						logrus.Infof("DONE: %+v", result)
 					}
-					logrus.Infof("%+v", result)
 				}
-			}(i)
+			}(i, ctx)
 		}
+
+		chSIG := make(chan os.Signal, 1)
+		signal.Notify(chSIG, os.Interrupt)
+
+		go func(ctx context.Context) {
+			<-chSIG
+			for i, fn := range stoppers {
+				logrus.WithField("worker", i).Debug("calling stop")
+				fn()
+			}
+		}(context.TODO())
 
 		files, err := fs.NewPcapList(input, "pcap")
 		if err != nil {
