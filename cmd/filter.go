@@ -73,7 +73,7 @@ var filterCmd = &cobra.Command{
 
 		filters := make(map[string]filter.Matcher)
 		for name, conditions := range cfg {
-			switch filter.NewFilterKind(viper.GetString("filter.kind")) {
+			switch filter.NewFilterKind(viper.GetString("filter.mode")) {
 			case filter.FilterKindSubnet:
 				matcher, err := filter.NewConditionalSubnet(conditions)
 				if err != nil {
@@ -88,8 +88,8 @@ var filterCmd = &cobra.Command{
 				filters[name] = matcher
 			default:
 				logrus.Fatalf(
-					"invalid filter kind %s, expected %s",
-					viper.GetString("filter.kind"),
+					"invalid filter.mode %s, expected %s",
+					viper.GetString("filter.mode"),
 					strings.Join(filter.FilterKinds, ", "),
 				)
 			}
@@ -168,31 +168,31 @@ var filterCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(filterCmd)
 
-	filterCmd.PersistentFlags().String("filter-yaml", "filter.yml",
+	filterCmd.PersistentFlags().String("yaml", "filter.yml",
 		`Source file for BPF filters. `+
 			`Format is YAML. Key is name of the filter which also translates to output folder. `+
 			`Value is a list of networks. Packets matching those networks will be written to output file.`)
-	viper.BindPFlag("filter.yaml", filterCmd.PersistentFlags().Lookup("filter-yaml"))
+	viper.BindPFlag("filter.yaml", filterCmd.PersistentFlags().Lookup("yaml"))
 
-	filterCmd.PersistentFlags().Int("filter-workers", 4, `Number of PCAP files to be parsed at once.`)
-	viper.BindPFlag("filter.workers", filterCmd.PersistentFlags().Lookup("filter-workers"))
+	filterCmd.PersistentFlags().Int("workers", 4, `Number of PCAP files to be parsed at once.`)
+	viper.BindPFlag("filter.workers", filterCmd.PersistentFlags().Lookup("workers"))
 
-	filterCmd.PersistentFlags().String("filter-input", "", `Input folder for filtered PCAP files.`)
-	viper.BindPFlag("filter.input", filterCmd.PersistentFlags().Lookup("filter-input"))
+	filterCmd.PersistentFlags().String("input", "", `Input folder for filtered PCAP files.`)
+	viper.BindPFlag("filter.input", filterCmd.PersistentFlags().Lookup("input"))
 
-	filterCmd.PersistentFlags().String("filter-output", "", `Output folder for filtered PCAP files.`)
-	viper.BindPFlag("filter.output", filterCmd.PersistentFlags().Lookup("filter-output"))
+	filterCmd.PersistentFlags().String("output", "", `Output folder for filtered PCAP files.`)
+	viper.BindPFlag("filter.output", filterCmd.PersistentFlags().Lookup("output"))
 
-	filterCmd.PersistentFlags().Bool("filter-decap", false, `Decapsulate GRE and ERSPAN headers.`)
-	viper.BindPFlag("filter.decap", filterCmd.PersistentFlags().Lookup("filter-decap"))
+	filterCmd.PersistentFlags().Bool("decap", false, `Decapsulate GRE and ERSPAN headers.`)
+	viper.BindPFlag("filter.decap", filterCmd.PersistentFlags().Lookup("decap"))
 
-	filterCmd.PersistentFlags().Bool("filter-compress", false, `Write output packets directly to gzip stream.`)
-	viper.BindPFlag("filter.compress", filterCmd.PersistentFlags().Lookup("filter-compress"))
+	filterCmd.PersistentFlags().Bool("compress", false, `Write output packets directly to gzip stream.`)
+	viper.BindPFlag("filter.compress", filterCmd.PersistentFlags().Lookup("compress"))
 
 	filterCmd.PersistentFlags().String(
-		"filter-kind",
+		"mode",
 		filter.FilterKinds[0],
 		fmt.Sprintf("Select filtering modes. Supported are %s", strings.Join(filter.FilterKinds, ",")),
 	)
-	viper.BindPFlag("filter.kind", filterCmd.PersistentFlags().Lookup("filter-kind"))
+	viper.BindPFlag("filter.mode", filterCmd.PersistentFlags().Lookup("mode"))
 }
