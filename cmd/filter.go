@@ -120,8 +120,8 @@ var filterCmd = &cobra.Command{
 							Output: task.Output,
 						},
 						Filter:      task.Filter,
-						Decapsulate: true,
-						Compress:    true,
+						Decapsulate: viper.GetBool("filter.decap"),
+						Compress:    viper.GetBool("filter.compress"),
 						StatFunc: func(fr filter.FilterResult) {
 							logrus.Debugf("%+v", fr)
 						},
@@ -182,6 +182,12 @@ func init() {
 
 	filterCmd.PersistentFlags().String("filter-output", "", `Output folder for filtered PCAP files.`)
 	viper.BindPFlag("filter.output", filterCmd.PersistentFlags().Lookup("filter-output"))
+
+	filterCmd.PersistentFlags().Bool("filter-decap", false, `Decapsulate GRE and ERSPAN headers.`)
+	viper.BindPFlag("filter.decap", filterCmd.PersistentFlags().Lookup("filter-decap"))
+
+	filterCmd.PersistentFlags().Bool("filter-compress", false, `Write output packets directly to gzip stream.`)
+	viper.BindPFlag("filter.compress", filterCmd.PersistentFlags().Lookup("filter-compress"))
 
 	filterCmd.PersistentFlags().String(
 		"filter-kind",
