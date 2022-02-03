@@ -137,7 +137,7 @@ var filterCmd = &cobra.Command{
 							Decapsulate: viper.GetBool("filter.decap"),
 							Compress:    viper.GetBool("filter.compress"),
 							StatFunc: func(fr filter.FilterResult) {
-								logrus.Debugf("%+v", fr)
+								logrus.WithField("worker", id).Debugf("%+v", fr)
 							},
 							Ctx: ctx,
 						})
