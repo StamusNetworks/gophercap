@@ -78,7 +78,7 @@ func (cs ConditionSubnet) match(ip net.IP) bool {
 	return false
 }
 
-func NewPortMatcher(p []string) (*ConditionEndpoint, error) {
+func NewPortMatcher(p []string) (ConditionEndpoint, error) {
 	vals := make(map[gopacket.Endpoint]bool)
 	for _, raw := range p {
 		bits := strings.Split(raw, "/")
@@ -102,12 +102,10 @@ func NewPortMatcher(p []string) (*ConditionEndpoint, error) {
 			)
 		}
 	}
-	return &ConditionEndpoint{Values: vals}, nil
+	return vals, nil
 }
 
-type ConditionEndpoint struct {
-	Values map[gopacket.Endpoint]bool
-}
+type ConditionEndpoint map[gopacket.Endpoint]bool
 
 func (cs ConditionEndpoint) Match(pkt gopacket.Packet) bool {
 	if t := pkt.TransportLayer(); t != nil {
@@ -118,5 +116,5 @@ func (cs ConditionEndpoint) Match(pkt gopacket.Packet) bool {
 }
 
 func (cs ConditionEndpoint) match(v gopacket.Endpoint) bool {
-	return cs.Values[v]
+	return cs[v]
 }
