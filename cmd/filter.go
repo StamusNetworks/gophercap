@@ -19,14 +19,12 @@ package cmd
 import (
 	"context"
 	"errors"
-	"fmt"
 	"gopherCap/pkg/filter"
 	"gopherCap/pkg/fs"
 	"io/ioutil"
 	"os"
 	"os/signal"
 	"path/filepath"
-	"strings"
 	"sync"
 
 	"github.com/sirupsen/logrus"
@@ -68,34 +66,19 @@ var filterCmd = &cobra.Command{
 		if err != nil {
 			logrus.Fatalf("Filter input read: %s", err)
 		}
-		var cfg filter.ConfigFileInput
+		var cfg filter.YAMLConfig
 		if err := yaml.Unmarshal(data, &cfg); err != nil {
 			logrus.Fatal(err)
 		}
 
 		filters := make(map[string]filter.Matcher)
-		for name, conditions := range cfg {
-			switch filter.NewFilterKind(viper.GetString("filter.mode")) {
-			case filter.FilterKindSubnet:
-				matcher, err := filter.NewConditionalSubnet(conditions)
-				if err != nil {
-					logrus.Fatal(err)
-				}
-				filters[name] = matcher
-			case filter.FilterKindPort:
-				matcher, err := filter.NewPortMatcher(conditions)
-				if err != nil {
-					logrus.Fatal(err)
-				}
-				filters[name] = matcher
-			default:
-				logrus.Fatalf(
-					"invalid filter.mode %s, expected %s",
-					viper.GetString("filter.mode"),
-					strings.Join(filter.FilterKinds, ", "),
-				)
+		for name, config := range cfg {
+			m, err := filter.NewCombinedMatcher(config)
+			if err != nil {
+				logrus.Fatal(err)
 			}
-
+			filters[name] = m
+			logrus.Infof("filter %s got %d conditions", name, len(m.Conditions))
 		}
 
 		tasks := make(chan filter.Task, workers)
@@ -221,11 +204,4 @@ func init() {
 
 	filterCmd.PersistentFlags().Bool("compress", false, `Write output packets directly to gzip stream.`)
 	viper.BindPFlag("filter.compress", filterCmd.PersistentFlags().Lookup("compress"))
-
-	filterCmd.PersistentFlags().String(
-		"mode",
-		filter.FilterKinds[0],
-		fmt.Sprintf("Select filtering modes. Supported are %s", strings.Join(filter.FilterKinds, ",")),
-	)
-	viper.BindPFlag("filter.mode", filterCmd.PersistentFlags().Lookup("mode"))
 }

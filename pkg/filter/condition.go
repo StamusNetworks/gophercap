@@ -40,6 +40,66 @@ type Matcher interface {
 	Match(gopacket.Packet) bool
 }
 
+// CombinedMatcher allows us to use multiple match criteria
+type CombinedMatcher struct {
+	Conditions []Matcher
+}
+
+func (cm CombinedMatcher) Match(pkt gopacket.Packet) bool {
+	for _, matcher := range cm.Conditions {
+		if !matcher.Match(pkt) {
+			return false
+		}
+	}
+	return true
+}
+
+func NewCombinedMatcher(c CombinedConfig) (*CombinedMatcher, error) {
+	if len(c.Conditions) == 0 {
+		return nil, errors.New("combined config condition missing")
+	}
+	conditions := make([]Matcher, 0, len(c.Conditions))
+	for i, condition := range c.Conditions {
+		var m Matcher
+		switch NewFilterKind(condition.Kind) {
+		case FilterKindSubnet:
+			sm, err := NewConditionalSubnet(condition.Match)
+			if err != nil {
+				return nil, err
+			}
+			m = sm
+		case FilterKindPort:
+			pm, err := NewPortMatcher(condition.Match)
+			if err != nil {
+				return nil, err
+			}
+			m = pm
+		default:
+			return nil, fmt.Errorf(
+				"filtering condition %s unsupported for condition %d, use one of %s",
+				condition.Kind, i, strings.Join(FilterKinds, ", "),
+			)
+		}
+		if m == nil {
+			return nil, fmt.Errorf("unable to build matcher for item %d", i)
+		}
+		if condition.Negate {
+			m = NegateMatcher{M: m}
+		}
+		conditions = append(conditions, m)
+	}
+	return &CombinedMatcher{
+		Conditions: conditions,
+	}, nil
+}
+
+// NegateMatcher implements logical NOT
+type NegateMatcher struct {
+	M Matcher
+}
+
+func (nm NegateMatcher) Match(pkt gopacket.Packet) bool { return !nm.M.Match(pkt) }
+
 // NewConditionalSubnet parses a list of textual network addrs into a Matcher
 func NewConditionalSubnet(nets []string) (ConditionSubnet, error) {
 	if len(nets) == 0 {

@@ -17,8 +17,6 @@ type ErrEarlyExit struct{}
 
 func (e ErrEarlyExit) Error() string { return "early exit" }
 
-type ConfigFileInput map[string][]string
-
 // Config holds params needed by ReadAndFilterNetworks
 type Config struct {
 	ID int
