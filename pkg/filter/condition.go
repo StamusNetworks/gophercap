@@ -35,8 +35,20 @@ const (
 	FilterKindPort
 )
 
+func (k FilterKind) String() string {
+	switch k {
+	case FilterKindSubnet:
+		return "subnet"
+	case FilterKindPort:
+		return "port"
+	default:
+		return "undefined"
+	}
+}
+
 var FilterKinds = []string{
-	"subnet", "port",
+	FilterKindSubnet.String(),
+	FilterKindPort.String(),
 }
 
 func NewFilterKind(raw string) FilterKind {

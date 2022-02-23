@@ -16,7 +16,10 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 package models
 
-import "time"
+import (
+	"net"
+	"time"
+)
 
 type Period struct {
 	Beginning time.Time `json:"beginning"`
@@ -45,4 +48,19 @@ type Rates struct {
 	PPS           float64       `json:"pps"`
 	Duration      time.Duration `json:"duration"`
 	DurationHuman string        `json:"duration_human"`
+}
+
+type EVE struct {
+	SrcIP     net.IP `json:"src_ip,omitempty"`
+	DestIP    net.IP `json:"dest_ip,omitempty"`
+	SrcPort   int    `json:"src_port,omitempty"`
+	DestPort  int    `json:"dest_port,omitempty"`
+	EventType string `json:"event_type,omitempty"`
+	FlowID    int    `json:"flow_id,omitempty"`
+}
+
+type Alert struct {
+	Signature   string `json:"signature,omitempty"`
+	SignatureID int    `json:"signature_id,omitempty"`
+	Category    string `json:"category,omitempty"`
 }
