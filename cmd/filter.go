@@ -73,7 +73,10 @@ var filterCmd = &cobra.Command{
 
 		filters := make(map[string]filter.Matcher)
 		for name, config := range cfg {
-			m, err := filter.NewCombinedMatcher(config)
+			m, err := filter.NewCombinedMatcher(filter.MatcherConfig{
+				CombinedConfig: config,
+				MaxMindASN:     viper.GetString("filter.maxmind.asn"),
+			})
 			if err != nil {
 				logrus.Fatal(err)
 			}
@@ -204,4 +207,7 @@ func init() {
 
 	filterCmd.PersistentFlags().Bool("compress", false, `Write output packets directly to gzip stream.`)
 	viper.BindPFlag("filter.compress", filterCmd.PersistentFlags().Lookup("compress"))
+
+	filterCmd.PersistentFlags().String("maxmind-asn", "", `Path to maxmind ASN database. Only needed if ASN filter is used.`)
+	viper.BindPFlag("filter.maxmind.asn", filterCmd.PersistentFlags().Lookup("maxmind-asn"))
 }

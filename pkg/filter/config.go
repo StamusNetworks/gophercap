@@ -27,3 +27,8 @@ type FilterItem struct {
 	Negate bool     `yaml:"negate,omitempty"`
 	Match  []string `yaml:"match,omitempty"`
 }
+
+type MatcherConfig struct {
+  CombinedConfig
+  MaxMindASN string
+}

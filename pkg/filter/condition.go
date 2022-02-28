@@ -25,6 +25,7 @@ import (
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
+	"github.com/oschwald/geoip2-golang"
 )
 
 type FilterKind int
@@ -33,6 +34,7 @@ const (
 	FilterKindUndefined FilterKind = iota
 	FilterKindSubnet
 	FilterKindPort
+	FilterKindASN
 )
 
 func (k FilterKind) String() string {
@@ -41,6 +43,8 @@ func (k FilterKind) String() string {
 		return "subnet"
 	case FilterKindPort:
 		return "port"
+	case FilterKindASN:
+		return "asn"
 	default:
 		return "undefined"
 	}
@@ -49,6 +53,7 @@ func (k FilterKind) String() string {
 var FilterKinds = []string{
 	FilterKindSubnet.String(),
 	FilterKindPort.String(),
+	FilterKindASN.String(),
 }
 
 func NewFilterKind(raw string) FilterKind {
@@ -57,6 +62,8 @@ func NewFilterKind(raw string) FilterKind {
 		return FilterKindSubnet
 	case FilterKinds[1]:
 		return FilterKindPort
+	case FilterKinds[2]:
+		return FilterKindASN
 	default:
 		return FilterKindUndefined
 	}
@@ -82,7 +89,7 @@ func (cm CombinedMatcher) Match(pkt gopacket.Packet) bool {
 	return true
 }
 
-func NewCombinedMatcher(c CombinedConfig) (*CombinedMatcher, error) {
+func NewCombinedMatcher(c MatcherConfig) (*CombinedMatcher, error) {
 	if len(c.Conditions) == 0 {
 		return nil, errors.New("combined config condition missing")
 	}
@@ -102,6 +109,15 @@ func NewCombinedMatcher(c CombinedConfig) (*CombinedMatcher, error) {
 				return nil, err
 			}
 			m = pm
+		case FilterKindASN:
+			if c.MaxMindASN == "" {
+				return nil, errors.New("asn matcher needs maxmind ASN database")
+			}
+			fa, err := NewConditionASN(c.MaxMindASN, condition.Match)
+			if err != nil {
+				return nil, err
+			}
+			m = fa
 		default:
 			return nil, fmt.Errorf(
 				"filtering condition %s unsupported for condition %d, use one of %s",
@@ -205,4 +221,51 @@ func (cs ConditionEndpoint) Match(pkt gopacket.Packet) bool {
 
 func (cs ConditionEndpoint) match(v gopacket.Endpoint) bool {
 	return cs[v]
+}
+
+type ConditionASN struct {
+	Values      map[uint]bool
+	DB          *geoip2.Reader
+	LookupErrs  int
+	IPParseErrs int
+}
+
+func (ca ConditionASN) Match(pkt gopacket.Packet) bool {
+	if n := pkt.NetworkLayer(); n != nil {
+		return ca.match(net.ParseIP(n.NetworkFlow().Src().String())) ||
+			ca.match(net.ParseIP(n.NetworkFlow().Dst().String()))
+	}
+	return false
+}
+
+func (ca *ConditionASN) match(ip net.IP) bool {
+	if ip == nil {
+		ca.IPParseErrs++
+		return false
+	}
+	resp, err := ca.DB.ASN(ip)
+	if err != nil {
+		ca.LookupErrs++
+		return false
+	}
+	return ca.Values[resp.AutonomousSystemNumber]
+}
+
+func NewConditionASN(path string, asn []string) (*ConditionASN, error) {
+	db, err := geoip2.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	conditions := make(map[uint]bool)
+	for _, val := range asn {
+		parsed, err := strconv.Atoi(val)
+		if err != nil {
+			return nil, err
+		}
+		conditions[uint(parsed)] = true
+	}
+	return &ConditionASN{
+		DB:     db,
+		Values: conditions,
+	}, nil
 }
