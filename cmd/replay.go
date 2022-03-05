@@ -21,7 +21,6 @@ import (
 	"regexp"
 	"time"
 
-	"gopherCap/pkg/pcapset"
 	"gopherCap/pkg/replay"
 
 	"github.com/sirupsen/logrus"
@@ -75,7 +74,7 @@ Increase interface MTU if you get this error:
 FATA[0005] send: Message too long
 `,
 	Run: func(cmd *cobra.Command, args []string) {
-		set, err := pcapset.LoadSetJSON(viper.GetString("global.dump.json"))
+		set, err := replay.LoadSetJSON(viper.GetString("global.dump.json"))
 		if err != nil {
 			logrus.Fatal(err)
 		}
@@ -96,6 +95,7 @@ FATA[0005] send: Message too long
 			logrus.Infof("Starting iteration %d", count)
 			handle, err := replay.NewHandle(replay.Config{
 				Set:            *set,
+				Ctx:            context.Background(),
 				WriteInterface: viper.GetString("replay.out.interface"),
 				ScaleDuration:  viper.GetDuration("replay.time.scale.duration"),
 				ScaleEnabled:   viper.GetBool("replay.time.scale.enabled"),
@@ -111,18 +111,6 @@ FATA[0005] send: Message too long
 						return re
 					}
 					return nil
-				}(),
-				SpeedModifier: func() float64 {
-					if viper.GetBool("replay.time.scale.enabled") {
-						dur := viper.GetDuration("replay.time.scale.duration")
-						mod := float64(set.Duration()) / float64(dur)
-						logrus.Infof(
-							"Timescaling enabled with duration %s. Set duration is %s. Using modifier %.2f",
-							dur, set.Duration(), mod,
-						)
-						return mod
-					}
-					return viper.GetFloat64("replay.time.modifier")
 				}(),
 				TimeFrom: func() time.Time {
 					if from := viper.GetString("replay.time.from"); from != "" {
@@ -148,21 +136,12 @@ FATA[0005] send: Message too long
 			if err != nil {
 				logrus.Fatal(err)
 			}
-			go func() {
-				for err := range handle.Errors() {
-					logrus.Error(err)
-				}
-			}()
-			logrus.Debugf(
-				"Global set period is %s ->>> %s",
-				handle.FileSet.Period.Beginning,
-				handle.FileSet.Period.End,
-			)
-			for _, f := range handle.FileSet.Files {
-				logrus.Debugf("File %s in replay set beginning %s end %s", f.Path, f.Beginning, f.End)
-			}
+			logrus.WithFields(logrus.Fields{
+				"beginning": handle.FileSet.Beginning,
+				"end":       handle.FileSet.End,
+			}).Info("PCAP set loaded")
 			start := time.Now()
-			if err := handle.Play(context.TODO()); err != nil {
+			if err := handle.Play(); err != nil {
 				logrus.Fatal(err)
 			}
 			logrus.Infof("Iteration %d done in %s.", count, time.Since(start))

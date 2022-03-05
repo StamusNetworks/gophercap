@@ -20,7 +20,7 @@ import (
 	"archive/tar"
 	"compress/gzip"
 	"fmt"
-	"gopherCap/pkg/fs"
+	"gopherCap/pkg/replay"
 	"io"
 	"os"
 	"path/filepath"
@@ -52,7 +52,7 @@ gopherCap tarExtract \
 	--dryrun
 `,
 	Run: func(cmd *cobra.Command, args []string) {
-		fileReader, err := fs.Open(viper.GetString("tarball.in.file"))
+		fileReader, err := replay.Open(viper.GetString("tarball.in.file"))
 		if err != nil {
 			logrus.Fatalf("Tarball read: %s", err)
 		}

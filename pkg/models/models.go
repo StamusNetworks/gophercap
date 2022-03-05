@@ -38,6 +38,7 @@ type Counters struct {
 	Packets       int `json:"packets"`
 	Size          int `json:"size"`
 	MaxPacketSize int `json:"max_packet_size"`
+	OutOfOrder    int `json:"out_of_order"`
 }
 
 func (c Counters) PPS(interval time.Duration) float64 {

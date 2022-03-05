@@ -20,7 +20,7 @@ import (
 	"context"
 	"errors"
 	"gopherCap/pkg/filter"
-	"gopherCap/pkg/fs"
+	"gopherCap/pkg/replay"
 	"io/ioutil"
 	"os"
 	"os/signal"
@@ -153,7 +153,7 @@ var filterCmd = &cobra.Command{
 			}
 		}(context.TODO())
 
-		files, err := fs.NewPcapList(input, "pcap")
+		files, err := replay.FindPcapFiles(input, "pcap")
 		if err != nil {
 			logrus.Fatalf("PCAP list gen: %s", err)
 		}
@@ -171,8 +171,8 @@ var filterCmd = &cobra.Command{
 				}
 
 				tasks <- filter.Task{
-					Input:       fn.Path,
-					Output:      filepath.Join(outDir, filepath.Base(fn.Path)),
+					Input:       fn,
+					Output:      filepath.Join(outDir, filepath.Base(fn)),
 					Filter:      matcher,
 					Description: name,
 				}

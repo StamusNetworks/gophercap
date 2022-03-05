@@ -19,33 +19,35 @@ package replay
 import (
 	"context"
 	"errors"
-	"fmt"
+	"gopherCap/pkg/models"
+	"io"
 	"regexp"
-	"sync"
 	"time"
 
-	"gopherCap/pkg/pcapset"
-
 	"github.com/google/gopacket/pcap"
+	"github.com/google/gopacket/pcapgo"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/sync/errgroup"
 )
+
+var DelayGrace = 1000 * time.Nanosecond
 
 /*
 Config is used for passing Handle configurations when creating a new replay object
 */
 type Config struct {
-	Set            pcapset.Set
+	Set            PcapSet
 	WriteInterface string
 	FilterRegex    *regexp.Regexp
 	OutBpf         string
 	DisableWait    bool
 
-	SpeedModifier float64
 	ScaleDuration time.Duration
 	ScaleEnabled  bool
 	ScalePerFile  bool
 
 	TimeFrom, TimeTo time.Time
+	Ctx              context.Context
 }
 
 /*
@@ -53,11 +55,11 @@ Validate implements a standard interface for checking config struct validity and
 sane default values.
 */
 func (c Config) Validate() error {
+	if c.Ctx == nil {
+		return errors.New("missing replay stopper context")
+	}
 	if err := c.Set.Validate(); err != nil {
 		return err
-	}
-	if c.SpeedModifier < 0 {
-		return fmt.Errorf("Invalid speed modifier %.2f - should be positive value", c.SpeedModifier)
 	}
 	if c.ScaleEnabled && c.ScaleDuration == 0 {
 		return errors.New("Time scaling enabled but duration not defined")
@@ -69,25 +71,11 @@ func (c Config) Validate() error {
 Handle is the core object managing replay state
 */
 type Handle struct {
-	FileSet pcapset.Set
-
-	speedMod      float64
-	scaleEnabled  bool
-	scalePerFile  bool
-	scaleDuration time.Duration
-
-	iface string
-
+	FileSet     PcapSet
+	speedMod    float64
+	iface       string
 	disableWait bool
-
-	packets chan []byte
-	errs    chan error
-
-	outBpf string
-
-	writer *pcap.Handle
-
-	wg *sync.WaitGroup
+	outBpf      string
 }
 
 /*
@@ -98,17 +86,10 @@ func NewHandle(c Config) (*Handle, error) {
 		return nil, err
 	}
 	h := &Handle{
-		FileSet:       c.Set,
-		wg:            &sync.WaitGroup{},
-		packets:       make(chan []byte, len(c.Set.Files)),
-		errs:          make(chan error, len(c.Set.Files)),
-		iface:         c.WriteInterface,
-		outBpf:        c.OutBpf,
-		disableWait:   c.DisableWait,
-		speedMod:      c.SpeedModifier,
-		scaleEnabled:  c.ScaleEnabled,
-		scalePerFile:  c.ScalePerFile,
-		scaleDuration: c.ScaleDuration,
+		FileSet:     c.Set,
+		iface:       c.WriteInterface,
+		outBpf:      c.OutBpf,
+		disableWait: c.DisableWait,
 	}
 	if c.FilterRegex != nil {
 		logrus.Info("Filtering pcap files")
@@ -128,81 +109,161 @@ func NewHandle(c Config) (*Handle, error) {
 			return h, err
 		}
 	}
-	for _, p := range h.FileSet.Files {
-		h.wg.Add(1)
-		go replayReadWorker(
-			h.wg,
-			p,
-			h.packets,
-			h.errs,
-			func() float64 {
-				if h.scaleEnabled {
-					return calculateSpeedModifier(func() time.Duration {
-						if h.scalePerFile {
-							return p.Period.Duration()
-						}
-						return h.FileSet.Period.Duration()
-					}(), h.scaleDuration, h.scalePerFile)
-				}
-				return h.speedMod
-			}(),
-			h.disableWait,
-		)
+	if err := h.FileSet.UpdateDelay(); err != nil {
+		return nil, err
 	}
-	go func() {
-		h.wg.Wait()
-		close(h.packets)
-	}()
+	if c.ScaleEnabled {
+		h.speedMod = h.FileSet.Duration().Seconds() / c.ScaleDuration.Seconds()
+		for _, item := range h.FileSet.Files {
+			item.Delay = item.Delay / time.Duration(h.speedMod)
+			item.DelayHuman = item.Delay.String()
+		}
+		logrus.
+			WithField("value", h.speedMod).
+			Info("scaling enabled, updated speed modifier")
+	}
+
 	return h, nil
 }
 
 // Play starts the replay sequence once Handle object has been constructed
-func (h *Handle) Play(ctx context.Context) error {
-	if h.writer == nil {
-		writer, err := pcap.OpenLive(h.iface, 65536, true, pcap.BlockForever)
-		if err != nil {
-			return err
-		}
-		h.writer = writer
-	}
-	defer h.writer.Close()
-	if h.outBpf != "" {
-		if err := h.writer.SetBPFFilter(h.outBpf); err != nil {
-			return err
-		}
-	}
-	var counter, lastCount uint64
-	ticker := time.NewTicker(1 * time.Second)
+func (h *Handle) Play() error {
+	packets := make(chan []byte)
 
-loop:
-	for {
-		select {
-		case <-ticker.C:
-			logrus.Infof("Written %d packets %d PPS", counter, counter-lastCount)
-			lastCount = counter
-		case packet, ok := <-h.packets:
-			if !ok {
-				break loop
-			}
-			if err := h.writer.WritePacketData(packet); err != nil {
+	pool, ctx := errgroup.WithContext(context.Background())
+	for _, p := range h.FileSet.Files {
+		type params struct {
+			Path  string
+			Delay time.Duration
+			models.Period
+		}
+		vals := params{
+			Path:  p.Path,
+			Delay: p.Delay,
+			Period: models.Period{
+				Beginning: p.Beginning,
+				End:       p.End,
+			},
+		}
+		pool.Go(func() error {
+			var outOfOrder, count int
+
+			start := time.Now()
+			estimate := vals.Period.Duration() / time.Duration(h.speedMod)
+
+			defer func() {
+				if !h.disableWait {
+					estimate = estimate + vals.Delay
+				}
+				logrus.WithFields(logrus.Fields{
+					"path":           vals.Path,
+					"took_actual":    time.Since(start),
+					"took_estimated": estimate,
+					"skip_ooo":       outOfOrder,
+					"sent_pkts":      count,
+					"delay":          vals.Delay,
+				}).Debug("file replay done")
+			}()
+
+			fh, err := Open(vals.Path)
+			if err != nil {
 				return err
 			}
-			counter++
+			defer fh.Close()
+			reader, err := pcapgo.NewReader(fh)
+			if err != nil {
+				return err
+			}
+
+			lctx := logrus.WithFields(logrus.Fields{
+				"delay_duration": vals.Delay,
+				"delay":          !h.disableWait,
+				"pcap":           vals.Path,
+				"estimate":       estimate,
+			})
+			lctx.Info("starting replay worker")
+
+			if !h.disableWait {
+				time.Sleep(vals.Delay)
+				if vals.Delay > 0 {
+					lctx.Debug("delay done, playing pcap")
+				}
+			}
+
+			last := vals.Beginning
+		loop:
+			for {
+				data, ci, err := reader.ReadPacketData()
+
+				if err != nil && err == io.EOF {
+					break loop
+				} else if err != nil {
+					return err
+				}
+
+				if ci.Timestamp.Before(last) {
+					outOfOrder++
+					// continue loop
+				}
+				delay := ci.Timestamp.Sub(last).Nanoseconds() / int64(h.speedMod)
+				delayDur := time.Duration(delay)
+				if delayDur > DelayGrace && !ci.Timestamp.Before(last) {
+					time.Sleep(delayDur)
+				}
+				packets <- data
+				last = ci.Timestamp
+				count++
+			}
+			return nil
+		})
+	}
+
+	writer, err := pcap.OpenLive(h.iface, 65536, true, pcap.BlockForever)
+	if err != nil {
+		return err
+	}
+	defer writer.Close()
+	if h.outBpf != "" {
+		if err := writer.SetBPFFilter(h.outBpf); err != nil {
+			return err
 		}
 	}
-	return nil
-}
 
-// Errors is used to extract async worker exit issues
-func (h Handle) Errors() <-chan error {
-	return h.errs
-}
+	go func() {
+		defer close(packets)
 
-func calculateSpeedModifier(period, scale time.Duration, scalePerFile bool) float64 {
-	if scalePerFile {
-		logrus.Debugf(
-			"Period %s scale %s diff multiplier %.2f", period, scale, float64(period)/float64(scale),
-		)
-	}
-	return float64(period) / float64(scale)
+		var counter, oversize uint64
+		ticker := time.NewTicker(5 * time.Second)
+		start := time.Now()
+
+	loop:
+		for {
+			select {
+			case <-ctx.Done():
+				break loop
+			case <-ticker.C:
+				logrus.WithFields(logrus.Fields{
+					"written":  counter,
+					"pps":      int(float64(counter) / time.Since(start).Seconds()),
+					"oversize": oversize,
+				}).Info("packets written")
+			case packet, ok := <-packets:
+				if !ok {
+					break loop
+				}
+				// FIXME - configurable max packet size
+				if len(packet) > 9000 {
+					oversize++
+					continue loop
+				}
+				if err := writer.WritePacketData(packet); err != nil {
+					logrus.Error(err)
+					break loop
+				}
+				counter++
+			}
+		}
+	}()
+
+	return pool.Wait()
 }

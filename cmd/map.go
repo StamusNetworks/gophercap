@@ -17,8 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 package cmd
 
 import (
-	"gopherCap/pkg/fs"
-	"gopherCap/pkg/pcapset"
+	"gopherCap/pkg/replay"
 
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -38,47 +37,18 @@ gopherCap map \
 	--dump-json /mnt/pcap/meta.json
 `,
 	Run: func(cmd *cobra.Command, args []string) {
-		files, err := fs.NewPcapList(
-			viper.GetString("map.dir.src"),
-			viper.GetString("map.file.suffix"),
-		)
-		if err != nil {
-			logrus.Fatal(err)
-		}
-
-		set, err := pcapset.NewPcapSetFromList(
-			files,
-			func() int {
-				if workers := viper.GetInt("map.file.workers"); workers > 0 {
-					logrus.Infof("Using %d workers for mapping", workers)
-					return workers
-				}
-				return len(files)
-			}(),
-			viper.GetString("global.file.regexp"),
-		)
+		set, err := replay.NewPcapSet(replay.MapConfig{
+			Directory: viper.GetString("map.dir.src"),
+			Suffix:    viper.GetString("map.file.suffix"),
+			Workers:   viper.GetInt("map.file.workers"),
+			Pattern:   viper.GetString("global.file.regexp"),
+		})
 
 		if err != nil {
 			logrus.Fatal(err)
 		}
 
-		for _, f := range set.Files {
-			if f.Err != nil {
-				logrus.Errorf("%s encountered error: %s", f.Path, f.Err)
-			} else {
-				logrus.Infof("%s -> %s ||| %d packets ||| %d bytes ||| %s",
-					f.Period.Beginning, f.Period.End, f.Counters.Packets, f.Counters.Size, f.Path)
-			}
-		}
-		if removed, err := set.FilterFilesWithErrs(); err != nil {
-			logrus.Fatal(err)
-		} else if removed > 0 {
-			logrus.Warnf("Unable to map %d files, removing from final dump.", removed)
-		}
-		logrus.Infof("Dumping %d pcap file info between %s and %s to %s.",
-			len(set.Files), set.Beginning, set.End, viper.GetString("global.dump.json"))
-
-		if err := pcapset.DumpSetJSON(viper.GetString("global.dump.json"), *set); err != nil {
+		if err := replay.DumpSetJSON(viper.GetString("global.dump.json"), *set); err != nil {
 			logrus.Fatal(err)
 		}
 	},
