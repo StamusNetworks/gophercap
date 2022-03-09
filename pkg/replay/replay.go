@@ -22,6 +22,7 @@ import (
 	"gopherCap/pkg/models"
 	"io"
 	"regexp"
+	"sort"
 	"time"
 
 	"github.com/google/gopacket/pcap"
@@ -41,6 +42,7 @@ type Config struct {
 	FilterRegex    *regexp.Regexp
 	OutBpf         string
 	DisableWait    bool
+	Reorder        bool
 
 	ScaleDuration time.Duration
 	ScaleEnabled  bool
@@ -81,6 +83,7 @@ type Handle struct {
 	skipOOO     bool
 	skipMTU     int
 	outBpf      string
+	reorder     bool
 }
 
 /*
@@ -97,6 +100,7 @@ func NewHandle(c Config) (*Handle, error) {
 		disableWait: c.DisableWait,
 		skipOOO:     c.SkipOutOfOrder,
 		skipMTU:     c.SkipMTU,
+		reorder:     c.Reorder,
 	}
 	if c.FilterRegex != nil {
 		logrus.Info("Filtering pcap files")
@@ -187,6 +191,7 @@ func (h *Handle) Play() error {
 				"delay":          !h.disableWait,
 				"pcap":           vals.Path,
 				"estimate":       estimate,
+				"batch_reorder":  h.reorder,
 			})
 			lctx.Info("starting replay worker")
 
@@ -197,32 +202,21 @@ func (h *Handle) Play() error {
 				}
 			}
 
-			last := vals.Beginning
-		loop:
-			for {
-				data, ci, err := reader.ReadPacketData()
+			var fn pktSendFunc
 
-				if err != nil && err == io.EOF {
-					break loop
-				} else if err != nil {
-					return err
-				}
-
-				if ci.Timestamp.Before(last) {
-					outOfOrder++
-					if h.skipOOO {
-						continue loop
-					}
-				}
-				delay := ci.Timestamp.Sub(last).Nanoseconds() / int64(h.speedMod)
-				delayDur := time.Duration(delay)
-				if delayDur > DelayGrace && !ci.Timestamp.Before(last) {
-					time.Sleep(delayDur)
-				}
-				packets <- data
-				last = ci.Timestamp
-				count++
+			if h.reorder {
+				fn = sendBatchReorder
+			} else {
+				fn = sendPerPacket
 			}
+
+			res, err := fn(vals.Beginning, reader, packets, *h)
+			if err != nil {
+				return err
+			}
+			count = res.count
+			outOfOrder = res.outOfOrder
+
 			return nil
 		})
 	}
@@ -274,4 +268,110 @@ func (h *Handle) Play() error {
 	}()
 
 	return pool.Wait()
+}
+
+type pktSendFunc func(time.Time, *pcapgo.Reader, chan<- []byte, Handle) (*result, error)
+
+type result struct {
+	count      int
+	outOfOrder int
+}
+
+func sendPerPacket(
+	last time.Time,
+	reader *pcapgo.Reader,
+	packets chan<- []byte,
+	h Handle,
+) (*result, error) {
+	res := &result{}
+loop:
+	for {
+		data, ci, err := reader.ReadPacketData()
+
+		if err != nil && err == io.EOF {
+			break loop
+		} else if err != nil {
+			return res, err
+		}
+
+		if ci.Timestamp.Before(last) {
+			res.outOfOrder++
+			if h.skipOOO {
+				continue loop
+			}
+		}
+		delay := ci.Timestamp.Sub(last).Nanoseconds() / int64(h.speedMod)
+		delayDur := time.Duration(delay)
+		if delayDur > DelayGrace && !ci.Timestamp.Before(last) {
+			time.Sleep(delayDur)
+		}
+		packets <- data
+		last = ci.Timestamp
+		res.count++
+	}
+	return res, nil
+}
+
+func sendBatchReorder(
+	last time.Time,
+	reader *pcapgo.Reader,
+	packets chan<- []byte,
+	h Handle,
+) (*result, error) {
+	res := &result{}
+	b := make(pBuf, 0, 100)
+
+loop:
+	for {
+		data, ci, err := reader.ReadPacketData()
+
+		if err != nil && err == io.EOF {
+			break loop
+		} else if err != nil {
+			return res, err
+		}
+
+		b = append(b, packet{
+			Timestamp: ci.Timestamp,
+			Payload:   data,
+		})
+
+		if res.count%100 == 0 {
+			last = sendPackets(b, packets, int64(h.speedMod), last)
+			b = make(pBuf, 0, 100)
+		}
+		res.count++
+	}
+	return res, nil
+}
+
+type pBuf []packet
+
+type packet struct {
+	Payload   []byte
+	Timestamp time.Time
+}
+
+func sendPackets(
+	b pBuf,
+	tx chan<- []byte,
+	mod int64,
+	prevLast time.Time,
+) (last time.Time) {
+
+	sort.Slice(b, func(i, j int) bool {
+		return b[i].Timestamp.Before(b[j].Timestamp)
+	})
+
+	last = prevLast
+	for _, pkt := range b {
+		delay := pkt.Timestamp.Sub(last).Nanoseconds() / mod
+		delayDur := time.Duration(delay)
+		if delayDur > DelayGrace && !pkt.Timestamp.Before(last) {
+			time.Sleep(delayDur)
+		}
+		tx <- pkt.Payload
+		last = pkt.Timestamp
+	}
+	return last
 }
