@@ -163,23 +163,6 @@ func (h *Handle) Play() error {
 		pool.Go(func() error {
 			var outOfOrder, count int
 
-			start := time.Now()
-			estimate := vals.Period.Duration() / time.Duration(h.speedMod)
-
-			defer func() {
-				if !h.disableWait {
-					estimate = estimate + vals.Delay
-				}
-				logrus.WithFields(logrus.Fields{
-					"path":           vals.Path,
-					"took_actual":    time.Since(start),
-					"took_estimated": estimate,
-					"out_of_order":   outOfOrder,
-					"sent_pkts":      count,
-					"delay":          vals.Delay,
-				}).Debug("file replay done")
-			}()
-
 			fh, err := Open(vals.Path)
 			if err != nil {
 				return err
@@ -190,11 +173,28 @@ func (h *Handle) Play() error {
 				return err
 			}
 
+			actualGlobalDuration := h.FileSet.Duration()
+			actualLocalDuration := vals.Duration()
+			scaledGlobalDuration := actualGlobalDuration / time.Duration(h.speedMod)
+			scaledLocalDuration := actualLocalDuration / time.Duration(h.speedMod)
+
+			if h.scale {
+				logrus.WithFields(logrus.Fields{
+					"actual_global_duration": actualGlobalDuration,
+					"actual_local_duration":  actualLocalDuration,
+					"scaled_global_duration": scaledGlobalDuration,
+					"scaled_local_duration":  scaledLocalDuration,
+					"actual_percentage":      (actualLocalDuration.Seconds() / actualGlobalDuration.Seconds()) * 100,
+					"scaled_percentage":      (scaledLocalDuration.Seconds() / scaledGlobalDuration.Seconds()) * 100,
+					"file":                   vals.Path,
+				}).Debug("scaling pcap")
+			}
+
 			lctx := logrus.WithFields(logrus.Fields{
 				"delay_duration": vals.Delay,
 				"delay":          !h.disableWait,
 				"pcap":           vals.Path,
-				"estimate":       estimate,
+				"estimate":       scaledLocalDuration,
 				"batch_reorder":  h.reorder,
 			})
 			lctx.Info("starting replay worker")
@@ -205,6 +205,18 @@ func (h *Handle) Play() error {
 					lctx.Debug("delay done, playing pcap")
 				}
 			}
+
+			start := time.Now()
+			defer func() {
+				logrus.WithFields(logrus.Fields{
+					"path":           vals.Path,
+					"took_actual":    time.Since(start),
+					"took_estimated": scaledLocalDuration,
+					"out_of_order":   outOfOrder,
+					"sent_pkts":      count,
+					"delay":          vals.Delay,
+				}).Debug("file replay done")
+			}()
 
 			var fn pktSendFunc
 
