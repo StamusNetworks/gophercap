@@ -78,6 +78,7 @@ Handle is the core object managing replay state
 type Handle struct {
 	FileSet     PcapSet
 	speedMod    float64
+	scale       bool
 	iface       string
 	disableWait bool
 	skipOOO     bool
@@ -124,6 +125,7 @@ func NewHandle(c Config) (*Handle, error) {
 		return nil, err
 	}
 	if c.ScaleEnabled {
+		h.scale = true
 		h.speedMod = h.FileSet.Duration().Seconds() / c.ScaleDuration.Seconds()
 		for _, item := range h.FileSet.Files {
 			item.Delay = item.Delay / time.Duration(h.speedMod)
@@ -132,6 +134,8 @@ func NewHandle(c Config) (*Handle, error) {
 		logrus.
 			WithField("value", h.speedMod).
 			Info("scaling enabled, updated speed modifier")
+	} else {
+		h.speedMod = 1
 	}
 
 	return h, nil
@@ -337,7 +341,7 @@ loop:
 		})
 
 		if res.count%100 == 0 {
-			last = sendPackets(b, packets, int64(h.speedMod), last)
+			last = sendPackets(b, packets, int64(h.speedMod), h.scale, last)
 			b = make(pBuf, 0, 100)
 		}
 		res.count++
@@ -356,6 +360,7 @@ func sendPackets(
 	b pBuf,
 	tx chan<- []byte,
 	mod int64,
+	scale bool,
 	prevLast time.Time,
 ) (last time.Time) {
 
