@@ -46,6 +46,9 @@ type Config struct {
 	ScaleEnabled  bool
 	ScalePerFile  bool
 
+	SkipOutOfOrder bool
+	SkipMTU        int
+
 	TimeFrom, TimeTo time.Time
 	Ctx              context.Context
 }
@@ -75,6 +78,8 @@ type Handle struct {
 	speedMod    float64
 	iface       string
 	disableWait bool
+	skipOOO     bool
+	skipMTU     int
 	outBpf      string
 }
 
@@ -90,6 +95,8 @@ func NewHandle(c Config) (*Handle, error) {
 		iface:       c.WriteInterface,
 		outBpf:      c.OutBpf,
 		disableWait: c.DisableWait,
+		skipOOO:     c.SkipOutOfOrder,
+		skipMTU:     c.SkipMTU,
 	}
 	if c.FilterRegex != nil {
 		logrus.Info("Filtering pcap files")
@@ -159,7 +166,7 @@ func (h *Handle) Play() error {
 					"path":           vals.Path,
 					"took_actual":    time.Since(start),
 					"took_estimated": estimate,
-					"skip_ooo":       outOfOrder,
+					"out_of_order":   outOfOrder,
 					"sent_pkts":      count,
 					"delay":          vals.Delay,
 				}).Debug("file replay done")
@@ -203,7 +210,9 @@ func (h *Handle) Play() error {
 
 				if ci.Timestamp.Before(last) {
 					outOfOrder++
-					// continue loop
+					if h.skipOOO {
+						continue loop
+					}
 				}
 				delay := ci.Timestamp.Sub(last).Nanoseconds() / int64(h.speedMod)
 				delayDur := time.Duration(delay)
@@ -251,8 +260,7 @@ func (h *Handle) Play() error {
 				if !ok {
 					break loop
 				}
-				// FIXME - configurable max packet size
-				if len(packet) > 9000 {
+				if len(packet) > h.skipMTU {
 					oversize++
 					continue loop
 				}

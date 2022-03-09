@@ -102,6 +102,8 @@ FATA[0005] send: Message too long
 				ScalePerFile:   viper.GetBool("replay.disable_wait"),
 				OutBpf:         viper.GetString("replay.out.bpf"),
 				DisableWait:    viper.GetBool("replay.disable_wait"),
+				SkipOutOfOrder: viper.GetBool("replay.skip.out_of_order"),
+				SkipMTU:        viper.GetInt("replay.skip.mtu"),
 				FilterRegex: func() *regexp.Regexp {
 					if pattern := viper.GetString("global.file.regexp"); pattern != "" {
 						re, err := regexp.Compile(pattern)
@@ -168,10 +170,6 @@ func init() {
 		`Number of iterations over pcap set. Will run infinitely if 0 or negative value is given.`)
 	viper.BindPFlag("replay.loop.count", replayCmd.PersistentFlags().Lookup("loop-count"))
 
-	replayCmd.PersistentFlags().Float64("time-modifier", 1,
-		`Modifier for speeding up or slowing down the replay by a factor of X.`)
-	viper.BindPFlag("replay.time.modifier", replayCmd.PersistentFlags().Lookup("time-modifier"))
-
 	replayCmd.Flags().String(
 		"time-from", "", `Start replay from this time.`)
 	viper.BindPFlag("replay.time.from", replayCmd.Flags().Lookup("time-from"))
@@ -182,8 +180,7 @@ func init() {
 
 	replayCmd.PersistentFlags().Bool("time-scale-enabled", false,
 		`Enable time scaling. `+
-			`When enabled, will automatically calculate replay.time.modifier value to replay pcap in specified time window. `+
-			`Overrides replay.time.modifier value. Actual replay is not guaranteed to complete in defined time, `+
+			`Actual replay is not guaranteed to complete in defined time, `+
 			`As overhead from sleep calculations causes a natural drift.`)
 	viper.BindPFlag("replay.time.scale.enabled", replayCmd.PersistentFlags().Lookup("time-scale-enabled"))
 
@@ -195,4 +192,10 @@ func init() {
 		`Disable initial wait before each PCAP file read. `+
 			`Useful when PCAPs are part of same logical set but not from same capture period.`)
 	viper.BindPFlag("replay.disable_wait", replayCmd.PersistentFlags().Lookup("wait-disable"))
+
+	replayCmd.PersistentFlags().Bool("skip-ooo", false, "Skip out of order packets. If disabled, out of order packets will be written with no delay.")
+	viper.BindPFlag("replay.skip.out_of_order", replayCmd.PersistentFlags().Lookup("skip-ooo"))
+
+	replayCmd.PersistentFlags().Int("skip-mtu", 1514, "Packets with total size in bytes bigger than this value will be dropped.")
+	viper.BindPFlag("replay.skip.mtu", replayCmd.PersistentFlags().Lookup("skip-mtu"))
 }
