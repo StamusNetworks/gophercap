@@ -31,7 +31,7 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-var DelayGrace = 1000 * time.Nanosecond
+var DelayGrace = 100 * time.Microsecond
 
 /*
 Config is used for passing Handle configurations when creating a new replay object
@@ -304,10 +304,9 @@ loop:
 				continue loop
 			}
 		}
-		delay := ci.Timestamp.Sub(last).Nanoseconds() / int64(h.speedMod)
-		delayDur := time.Duration(delay)
-		if delayDur > DelayGrace && !ci.Timestamp.Before(last) {
-			time.Sleep(delayDur)
+		delay := ci.Timestamp.Sub(last) / time.Duration(h.speedMod)
+		if delay > DelayGrace && !ci.Timestamp.Before(last) {
+			time.Sleep(delay)
 		}
 		packets <- data
 		last = ci.Timestamp
@@ -370,10 +369,9 @@ func sendPackets(
 
 	last = prevLast
 	for _, pkt := range b {
-		delay := pkt.Timestamp.Sub(last).Nanoseconds() / mod
-		delayDur := time.Duration(delay)
-		if delayDur > DelayGrace && !pkt.Timestamp.Before(last) {
-			time.Sleep(delayDur)
+		delay := pkt.Timestamp.Sub(last) / time.Duration(mod)
+		if delay > DelayGrace {
+			time.Sleep(delay)
 		}
 		tx <- pkt.Payload
 		last = pkt.Timestamp
