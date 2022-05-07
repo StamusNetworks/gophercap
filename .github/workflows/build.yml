@@ -1,0 +1,69 @@
+name: Publish
+
+on:
+  push:
+    tags:
+      - '*'
+
+jobs:
+
+  build:
+    name: Build binary
+    runs-on: ubuntu-20.04
+    steps:
+
+    - name: Set up Go 1.x
+      uses: actions/setup-go@v2
+      with:
+        go-version: 1.19
+
+    - name: Check out code into the Go module directory
+      uses: actions/checkout@v2
+
+    - name: Install libpcap
+      run: sudo apt install -y libpcap-dev --install-suggests
+
+    - name: Get dependencies
+      run:  go get -v
+      working-directory: "."
+
+    - name: Build
+      run: go build -o gopherCap .
+      working-directory: "."
+
+    - name: Compress the binary
+      run: gzip gopherCap
+      working-directory: "."
+
+    - uses: actions/upload-artifact@v2
+      with:
+        name: gopherCap.gz
+        path: ./gopherCap.gz
+
+    - name: Upload Linux binary to release
+      uses: svenstaro/upload-release-action@v2
+      with:
+        repo_token: ${{ secrets.GITHUB_TOKEN }}
+        file: ./gopherCap.gz
+        asset_name: gopherCap.gz
+        tag: ${{ github.ref }}
+        overwrite: true
+        body: |
+          ## Install
+
+          Simply decompress the binary and make it executable. All documentation can be found using `--help`. 
+          * Ensure that **libpcap** is installed;
+          * Requires amd64 platform, we do not provide arm builds because we build against libpcap;
+          * Only tested on recent ubuntu / debian, binary will likely crash on rolling-release distros such as arch or fedora because build is linked to `libc` and `libpcap`;
+
+          ```
+          gunzip gopherCap.gz
+          chmod u+x gopherCap
+          ./gopherCap --help
+          ```
+
+          Full configuration dictionary can be generated with `exampleConfig` command.
+
+          ```
+          ./gopherCap --config example.yml exampleConfig
+          ```
