@@ -51,8 +51,7 @@ func NewPcapFileList(dname string, event Event, fileFormat string) *PcapFileList
 	pl.DirName = dname
 	pl.buildPcapNameParsing(fileFormat)
 	if len(event.CaptureFile) > 0 {
-		fullName := path.Join(dname, event.CaptureFile)
-		pl.Files = append(pl.Files, fullName)
+		pl.Files = append(pl.Files, event.CaptureFile)
 		err := pl.buildPcapList()
 		if err != nil {
 			return nil

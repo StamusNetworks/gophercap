@@ -39,8 +39,12 @@ gopherCap extract \
 	--skip-bpf
 `,
 	Run: func(cmd *cobra.Command, args []string) {
-		extractConfig := &extract.ExtractPcapConfig{PcapLogDirectory: viper.GetString("extract.dir.pcap"), OutputName: viper.GetString("extract.dump.pcap"),
-			EventPath: viper.GetString("extract.event"), SkipBpf: viper.GetBool("extract.skip.bpf"), FileFormat: viper.GetString("extract.file.format")}
+		extractConfig := &extract.ExtractPcapConfig{
+			OutputName: viper.GetString("extract.dump.pcap"),
+			EventPath:  viper.GetString("extract.event"),
+			SkipBpf:    viper.GetBool("extract.skip.bpf"),
+			FileFormat: viper.GetString("extract.file.format"),
+		}
 		if err := extract.ExtractPcapFile(*extractConfig); err != nil {
 			logrus.Fatal(err)
 		}
@@ -50,9 +54,6 @@ gopherCap extract \
 func init() {
 	rootCmd.AddCommand(extractCmd)
 
-	extractCmd.PersistentFlags().String("dir-pcap", "",
-		`Source folder for pcap search.`)
-	viper.BindPFlag("extract.dir.pcap", extractCmd.PersistentFlags().Lookup("dir-pcap"))
 	extractCmd.PersistentFlags().String("event", "",
 		`Event to get flow info from.`)
 	viper.BindPFlag("extract.event", extractCmd.PersistentFlags().Lookup("event"))

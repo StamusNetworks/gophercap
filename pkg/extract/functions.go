@@ -23,7 +23,7 @@ import (
 	"io/ioutil"
 	"net"
 	"os"
-	"path"
+	"path/filepath"
 	"strconv"
 	"time"
 
@@ -103,11 +103,10 @@ func openPcapReaderHandle(fName string, bpfFilter string) (*pcap.Handle, error) 
 }
 
 type ExtractPcapConfig struct {
-	PcapLogDirectory string
-	OutputName       string
-	EventPath        string
-	FileFormat       string
-	SkipBpf          bool
+	OutputName string
+	EventPath  string
+	FileFormat string
+	SkipBpf    bool
 }
 
 /*
@@ -131,14 +130,14 @@ func ExtractPcapFile(config ExtractPcapConfig) error {
 	if err != nil {
 		return errors.New("Can't parse JSON in " + config.EventPath)
 	}
+	pcapDir := filepath.Dir(event.CaptureFile)
 
 	if len(event.CaptureFile) > 0 {
-		filename := path.Join(config.PcapLogDirectory, event.CaptureFile)
-		_, err := os.Stat(filename)
+		_, err := os.Stat(event.CaptureFile)
 		if os.IsNotExist(err) {
 			return err
 		}
-		logrus.Debugf("Starting from file %s", filename)
+		logrus.Debugf("Starting from file %s", event.CaptureFile)
 	}
 
 	if event.Tunnel.Depth != 0 {
@@ -150,7 +149,7 @@ func ExtractPcapFile(config ExtractPcapConfig) error {
 		return err
 	}
 
-	pcapFileList := NewPcapFileList(config.PcapLogDirectory, event, config.FileFormat)
+	pcapFileList := NewPcapFileList(pcapDir, event, config.FileFormat)
 	if pcapFileList == nil {
 		return errors.New("Problem when building pcap file list")
 	}
