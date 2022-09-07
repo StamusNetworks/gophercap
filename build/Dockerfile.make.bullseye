@@ -1,8 +1,0 @@
-# This dockerfile is meant to be used by Makefile
-FROM debian:bullseye as builder
-
-RUN mkdir /src
-COPY . /src
-WORKDIR /src
-
-RUN /src/build/ci/build_debian.sh
