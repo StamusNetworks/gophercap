@@ -5,7 +5,6 @@ COPY . /src/gopherCap
 WORKDIR /src/gopherCap
 
 RUN apt-get update && apt-get install -y libpcap-dev
-RUN go get -u
 RUN go build -o /tmp/gopherCap .
 
 FROM debian:buster
