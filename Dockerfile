@@ -1,4 +1,4 @@
-FROM golang:1.15-buster AS Builder
+FROM golang:1.19-buster AS Builder
 
 RUN mkdir -p /src
 COPY . /src/gopherCap
