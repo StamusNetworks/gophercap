@@ -10,9 +10,8 @@ build-debian:
 	@$(MAKE)	build-docker-debian
 	@$(MAKE)	clean-docker-builder
 build-docker-debian:
-	docker build -t gopher-builder -f build/Dockerfile.make.bullseye .
-	docker run --name gopher-builder -d gopher-builder
-	docker cp gopher-builder:/src/gopherCap .
+	docker build -t stamus/gophercap .
+	docker run --name gophercap-builder --entrypoint bash -d stamus/gophercap
+	docker cp gophercap-builder:/usr/local/bin/gopherCap .
 clean-docker-builder:
-	docker rm gopher-builder || echo "container not running"
-	docker image rm gopher-builder || echo "image not yet built"
+	docker rm gophercap-builder || echo "container not running"
