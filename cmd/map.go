@@ -17,7 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 package cmd
 
 import (
-	"gopherCap/pkg/replay"
+	"github.com/StamusNetworks/gophercap/pkg/replay"
 
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -43,7 +43,6 @@ gopherCap map \
 			Workers:   viper.GetInt("map.file.workers"),
 			Pattern:   viper.GetString("global.file.regexp"),
 		})
-
 		if err != nil {
 			logrus.Fatal(err)
 		}

@@ -16,7 +16,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 package main
 
-import "gopherCap/cmd"
+import "github.com/StamusNetworks/gophercap/cmd"
 
 func main() {
 	cmd.Execute()

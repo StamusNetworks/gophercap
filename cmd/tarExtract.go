@@ -20,12 +20,13 @@ import (
 	"archive/tar"
 	"compress/gzip"
 	"fmt"
-	"gopherCap/pkg/replay"
 	"io"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/StamusNetworks/gophercap/pkg/replay"
 
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"

@@ -19,11 +19,12 @@ package replay
 import (
 	"context"
 	"errors"
-	"gopherCap/pkg/models"
 	"io"
 	"regexp"
 	"sort"
 	"time"
+
+	"github.com/StamusNetworks/gophercap/pkg/models"
 
 	"github.com/google/gopacket/pcap"
 	"github.com/google/gopacket/pcapgo"
@@ -374,7 +375,6 @@ func sendPackets(
 	scale bool,
 	prevLast time.Time,
 ) (last time.Time) {
-
 	sort.Slice(b, func(i, j int) bool {
 		return b[i].Timestamp.Before(b[j].Timestamp)
 	})

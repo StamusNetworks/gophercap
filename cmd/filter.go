@@ -19,13 +19,14 @@ package cmd
 import (
 	"context"
 	"errors"
-	"gopherCap/pkg/filter"
-	"gopherCap/pkg/replay"
 	"io/ioutil"
 	"os"
 	"os/signal"
 	"path/filepath"
 	"sync"
+
+	"github.com/StamusNetworks/gophercap/pkg/filter"
+	"github.com/StamusNetworks/gophercap/pkg/replay"
 
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
