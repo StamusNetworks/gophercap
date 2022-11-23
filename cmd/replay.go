@@ -21,7 +21,7 @@ import (
 	"regexp"
 	"time"
 
-	"gopherCap/pkg/replay"
+	"github.com/StamusNetworks/gophercap/pkg/replay"
 
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"

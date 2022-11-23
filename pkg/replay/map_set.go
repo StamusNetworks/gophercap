@@ -3,9 +3,10 @@ package replay
 import (
 	"errors"
 	"fmt"
-	"gopherCap/pkg/models"
 	"regexp"
 	"time"
+
+	"github.com/StamusNetworks/gophercap/pkg/models"
 )
 
 type PcapSet struct {

@@ -17,7 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 package cmd
 
 import (
-	"gopherCap/pkg/extract"
+	"github.com/StamusNetworks/gophercap/pkg/extract"
 
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"

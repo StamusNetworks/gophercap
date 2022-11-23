@@ -17,8 +17,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 package cmd
 
 import (
-	"gopherCap/pkg/filter"
 	"os"
+
+	"github.com/StamusNetworks/gophercap/pkg/filter"
 
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"

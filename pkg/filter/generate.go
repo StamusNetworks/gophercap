@@ -19,10 +19,11 @@ package filter
 import (
 	"bufio"
 	"encoding/json"
-	"gopherCap/pkg/models"
 	"io"
 	"os"
 	"strconv"
+
+	"github.com/StamusNetworks/gophercap/pkg/models"
 )
 
 /*

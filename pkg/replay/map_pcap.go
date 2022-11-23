@@ -4,10 +4,11 @@ import (
 	"compress/gzip"
 	"context"
 	"errors"
-	"gopherCap/pkg/models"
 	"io"
 	"os"
 	"time"
+
+	"github.com/StamusNetworks/gophercap/pkg/models"
 
 	"github.com/google/gopacket/pcapgo"
 )

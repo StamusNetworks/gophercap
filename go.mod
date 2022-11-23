@@ -1,4 +1,4 @@
-module gopherCap
+module github.com/StamusNetworks/gophercap
 
 go 1.19
 

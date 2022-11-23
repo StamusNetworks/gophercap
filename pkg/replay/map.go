@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"gopherCap/pkg/models"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -13,6 +12,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/StamusNetworks/gophercap/pkg/models"
 
 	"github.com/sirupsen/logrus"
 )
