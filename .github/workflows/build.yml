@@ -37,6 +37,10 @@ jobs:
       run: go build -ldflags="-X 'gopherCap/cmd.Version=${{ github.ref_name }}'" -o gopherCap .
       working-directory: "."
 
+    - name: Execute binary for testing
+      run: ./gopherCap --help
+      working-directory: "."
+
     - name: Compress the binary
       run: gzip gopherCap
       working-directory: "."
