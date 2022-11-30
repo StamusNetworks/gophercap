@@ -27,6 +27,12 @@ jobs:
       run:  go get -v
       working-directory: "."
 
+    - name: Install govulncheck
+      run: go install golang.org/x/vuln/cmd/govulncheck@latest
+
+    - name: Check for vulnerabilities
+      run: govulncheck ./...
+
     - name: Build
       run: go build -ldflags="-X 'gopherCap/cmd.Version=${{ github.ref_name }}'" -o gopherCap .
       working-directory: "."
