@@ -19,7 +19,6 @@ package cmd
 import (
 	"context"
 	"errors"
-	"io/ioutil"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -56,14 +55,7 @@ var filterCmd = &cobra.Command{
 			logrus.Fatal(errors.New("Missing output folder"))
 		}
 
-		// YAML filter input where key is filter name and value is list of networks
-		f, err := os.Open(viper.GetString("filter.yaml"))
-		if err != nil {
-			logrus.Fatalf("Filter input read: %s", err)
-		}
-		defer f.Close()
-
-		data, err := ioutil.ReadAll(f)
+		data, err := os.ReadFile(viper.GetString("filter.yaml"))
 		if err != nil {
 			logrus.Fatalf("Filter input read: %s", err)
 		}
