@@ -48,7 +48,7 @@ type Config struct {
 
 	Compress bool
 
-	StatFunc func(FilterResult)
+	StatFunc func(map[string]any)
 
 	Ctx context.Context
 }
@@ -62,6 +62,19 @@ type FilterResult struct {
 	Start       time.Time
 	Took        time.Duration
 	Rate        string
+}
+
+func (fr FilterResult) Map() map[string]any {
+	return map[string]any{
+		"count":        fr.Count,
+		"matched":      fr.Matched,
+		"errors":       fr.Errors,
+		"decap_errors": fr.DecapErrors,
+		"skipped":      fr.Skipped,
+		"start":        fr.Start,
+		"took":         fr.Took,
+		"rate":         fr.Rate,
+	}
 }
 
 /*
@@ -125,7 +138,7 @@ loop:
 			res.Took = time.Since(res.Start)
 			res.Rate = fmt.Sprintf("%.2f pps", float64(res.Count)/res.Took.Seconds())
 			if c.StatFunc != nil {
-				c.StatFunc(*res)
+				c.StatFunc(res.Map())
 			}
 		default:
 		}
