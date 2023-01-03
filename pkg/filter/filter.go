@@ -101,7 +101,9 @@ func ReadAndFilter(c *Config) (*FilterResult, error) {
 	}
 
 	w := pcapgo.NewWriter(writer)
-	w.WriteFileHeader(uint32(input.Snaplen()), input.LinkType())
+	if err := w.WriteFileHeader(uint32(input.Snaplen()), input.LinkType()); err != nil {
+		return nil, err
+	}
 
 	report := time.NewTicker(5 * time.Second)
 
