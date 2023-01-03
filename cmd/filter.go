@@ -55,26 +55,31 @@ var filterCmd = &cobra.Command{
 			logrus.Fatal(errors.New("Missing output folder"))
 		}
 
-		data, err := os.ReadFile(viper.GetString("filter.yaml"))
-		if err != nil {
-			logrus.Fatalf("Filter input read: %s", err)
-		}
-		var cfg filter.YAMLConfig
-		if err := yaml.Unmarshal(data, &cfg); err != nil {
-			logrus.Fatal(err)
-		}
-
 		filters := make(map[string]filter.Matcher)
-		for name, config := range cfg {
-			m, err := filter.NewCombinedMatcher(filter.MatcherConfig{
-				CombinedConfig: config,
-				MaxMindASN:     viper.GetString("filter.maxmind.asn"),
-			})
+
+		if configPath := viper.GetString("filter.yaml"); configPath != "" {
+			var cfg filter.YAMLConfig
+			data, err := os.ReadFile(viper.GetString("filter.yaml"))
 			if err != nil {
+				logrus.Fatalf("Filter input read: %s", err)
+			}
+			if err := yaml.Unmarshal(data, &cfg); err != nil {
 				logrus.Fatal(err)
 			}
-			filters[name] = m
-			logrus.Infof("filter %s got %d conditions", name, len(m.Conditions))
+			for name, config := range cfg {
+				m, err := filter.NewCombinedMatcher(filter.MatcherConfig{
+					CombinedConfig: config,
+					MaxMindASN:     viper.GetString("filter.maxmind.asn"),
+				})
+				if err != nil {
+					logrus.Fatal(err)
+				}
+				filters[name] = m
+				logrus.Infof("filter %s got %d conditions", name, len(m.Conditions))
+			}
+		} else {
+			logrus.Warn("Filter config missing, running with empty set")
+			filters["raw"] = filter.DummyMatcher{}
 		}
 
 		tasks := make(chan filter.Task, workers)
@@ -163,6 +168,10 @@ var filterCmd = &cobra.Command{
 					logrus.Fatalf("Output path %s exists and is not a directory", output)
 				}
 
+				logrus.WithFields(logrus.Fields{
+					"filter": name,
+					"path":   fn,
+				}).Info("feeding file to matcher")
 				tasks <- filter.Task{
 					Input:       fn,
 					Output:      filepath.Join(outDir, filepath.Base(fn)),
@@ -180,7 +189,7 @@ var filterCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(filterCmd)
 
-	filterCmd.PersistentFlags().String("yaml", "filter.yml",
+	filterCmd.PersistentFlags().String("yaml", "",
 		`Source file for BPF filters. `+
 			`Format is YAML. Key is name of the filter which also translates to output folder. `+
 			`Value is a list of networks. Packets matching those networks will be written to output file.`)

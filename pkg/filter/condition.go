@@ -75,6 +75,12 @@ type Matcher interface {
 	Match(gopacket.Packet) bool
 }
 
+type DummyMatcher struct{}
+
+func (d DummyMatcher) Match(pkt gopacket.Packet) bool {
+	return true
+}
+
 // CombinedMatcher allows us to use multiple match criteria
 type CombinedMatcher struct {
 	Conditions []Matcher
