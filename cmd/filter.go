@@ -146,7 +146,7 @@ var filterCmd = &cobra.Command{
 			}
 		}(context.TODO())
 
-		files, err := replay.FindPcapFiles(input, "pcap")
+		files, err := replay.FindPcapFiles(input, viper.GetString("filter.suffix"))
 		if err != nil {
 			logrus.Fatalf("PCAP list gen: %s", err)
 		}
@@ -203,4 +203,7 @@ func init() {
 
 	filterCmd.PersistentFlags().String("maxmind-asn", "", `Path to maxmind ASN database. Only needed if ASN filter is used.`)
 	viper.BindPFlag("filter.maxmind.asn", filterCmd.PersistentFlags().Lookup("maxmind-asn"))
+
+	filterCmd.PersistentFlags().String("suffix", "pcap", "Find files with following suffix.")
+	viper.BindPFlag("filter.suffix", filterCmd.PersistentFlags().Lookup("suffix"))
 }
