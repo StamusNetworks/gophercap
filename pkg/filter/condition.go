@@ -35,6 +35,7 @@ const (
 	FilterKindSubnet
 	FilterKindPort
 	FilterKindASN
+	FilterKindRaw
 )
 
 func (k FilterKind) String() string {
@@ -45,6 +46,8 @@ func (k FilterKind) String() string {
 		return "port"
 	case FilterKindASN:
 		return "asn"
+	case FilterKindRaw:
+		return "raw"
 	default:
 		return "undefined"
 	}
@@ -54,16 +57,19 @@ var FilterKinds = []string{
 	FilterKindSubnet.String(),
 	FilterKindPort.String(),
 	FilterKindASN.String(),
+	FilterKindRaw.String(),
 }
 
 func NewFilterKind(raw string) FilterKind {
 	switch raw {
-	case FilterKinds[0]:
+	case FilterKindSubnet.String():
 		return FilterKindSubnet
-	case FilterKinds[1]:
+	case FilterKindPort.String():
 		return FilterKindPort
-	case FilterKinds[2]:
+	case FilterKindASN.String():
 		return FilterKindASN
+	case FilterKindRaw.String():
+		return FilterKindRaw
 	default:
 		return FilterKindUndefined
 	}
@@ -124,6 +130,8 @@ func NewCombinedMatcher(c MatcherConfig) (*CombinedMatcher, error) {
 				return nil, err
 			}
 			m = fa
+		case FilterKindRaw:
+			m = &DummyMatcher{}
 		default:
 			return nil, fmt.Errorf(
 				"filtering condition %s unsupported for condition %d, use one of %s",
