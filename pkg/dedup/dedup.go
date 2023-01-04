@@ -35,3 +35,31 @@ loop:
 	}
 	return hex.EncodeToString(h.Sum(nil))
 }
+
+// Dedupper is a subsystem that accepts a gopacket type and reports if it has been already seen
+type Dedupper interface {
+	// Drop implements Dedupper
+	Drop(gopacket.Packet) bool
+}
+
+// TrivialDedup is only a minimal prototype for simple testing and SHOULD NOT BE USED
+// It will leak memory and will likely see a high hash collision rate
+type TrivialDedup struct {
+	Set  map[string]bool
+	Hits uint64
+}
+
+// Drop implements Dedupper
+func (d *TrivialDedup) Drop(pkt gopacket.Packet) (found bool) {
+	if d.Set == nil {
+		// this object should not have a constructor
+		d.Set = make(map[string]bool)
+	}
+	h := HashMD5(pkt)
+	if d.Set[h] {
+		found = true
+		d.Hits++
+	}
+	d.Set[h] = true
+	return found
+}
