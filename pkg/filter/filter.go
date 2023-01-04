@@ -114,12 +114,15 @@ func ReadAndFilter(c *Config) (*FilterResult, error) {
 	}
 	defer output.Close()
 
+	bufWriter := bufio.NewWriterSize(output, 1024*64)
+	defer bufWriter.Flush()
+
 	if c.Compress {
-		gw := gzip.NewWriter(output)
+		gw := gzip.NewWriter(bufWriter)
 		defer gw.Close()
 		writer = gw
 	} else {
-		writer = output
+		writer = bufWriter
 	}
 
 	w := pcapgo.NewWriter(writer)
