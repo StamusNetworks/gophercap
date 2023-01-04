@@ -47,6 +47,8 @@ type Config struct {
 	Filter Matcher
 	// Enable GRE and ERSPAN packet decapsulation
 	Decapsulate bool
+	// How many layers should be checked for decapsulation
+	DecapMaxDepth int
 
 	Compress bool
 
@@ -155,7 +157,7 @@ loop:
 		}
 		pkt := gopacket.NewPacket(raw, input.LinkType(), gopacket.Default)
 		if c.Decapsulate {
-			pkt, err = DecapGREandERSPAN(pkt)
+			pkt, err = DecapGREandERSPAN(pkt, c.DecapMaxDepth)
 			if err != nil {
 				res.DecapErrors++
 				continue loop

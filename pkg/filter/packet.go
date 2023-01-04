@@ -23,9 +23,14 @@ import (
 	"github.com/google/gopacket/layers"
 )
 
-func DecapGREandERSPAN(pkt gopacket.Packet) (gopacket.Packet, error) {
+func DecapGREandERSPAN(pkt gopacket.Packet, maxdepth int) (gopacket.Packet, error) {
 	var startLayer int
+loop:
 	for i, layer := range pkt.Layers() {
+		if maxdepth > 0 && i+1 == maxdepth {
+			// this can be a good performance optimization to only loop over N posterior layers
+			break loop
+		}
 		switch layer.LayerType() {
 		case layers.LayerTypeGRE:
 			startLayer = i

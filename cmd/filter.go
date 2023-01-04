@@ -117,9 +117,10 @@ var filterCmd = &cobra.Command{
 								Input:  task.Input,
 								Output: task.Output,
 							},
-							Filter:      task.Filter,
-							Decapsulate: viper.GetBool("filter.decap"),
-							Compress:    viper.GetBool("filter.compress"),
+							Filter:        task.Filter,
+							Decapsulate:   viper.GetBool("filter.decap.enabled"),
+							DecapMaxDepth: viper.GetInt("filter.decap.depth"),
+							Compress:      viper.GetBool("filter.compress"),
 							StatFunc: func(fr map[string]any) {
 								logrus.WithField("worker", id).WithFields(fr).Debug("filter report")
 							},
@@ -209,7 +210,10 @@ func init() {
 	viper.BindPFlag("filter.output", filterCmd.PersistentFlags().Lookup("output"))
 
 	filterCmd.PersistentFlags().Bool("decap", false, `Decapsulate GRE and ERSPAN headers.`)
-	viper.BindPFlag("filter.decap", filterCmd.PersistentFlags().Lookup("decap"))
+	viper.BindPFlag("filter.decap.enabled", filterCmd.PersistentFlags().Lookup("decap"))
+
+	filterCmd.PersistentFlags().Int("decap-depth", -1, `Max posterior packet layers to check for decap.`)
+	viper.BindPFlag("filter.decap.depth", filterCmd.PersistentFlags().Lookup("decap-depth"))
 
 	filterCmd.PersistentFlags().Bool("compress", false, `Write output packets directly to gzip stream.`)
 	viper.BindPFlag("filter.compress", filterCmd.PersistentFlags().Lookup("compress"))
