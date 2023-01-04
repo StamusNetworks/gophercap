@@ -3,6 +3,7 @@ package dedup
 import (
 	"crypto/md5"
 	"encoding/hex"
+	"time"
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
@@ -62,4 +63,64 @@ func (d *TrivialDedup) Drop(pkt gopacket.Packet) (found bool) {
 	}
 	d.Set[h] = true
 	return found
+}
+
+// CircularDedup maintains N buckets of hash sets
+// hash lookup is done from all
+// if hash is not found, add to latest
+// rotate buckets if bucket duration has passed
+type CircularDedup struct {
+	// circular array of hash sets
+	Buckets []map[string]bool
+	// max number of buckets to be kept
+	MaxBuckets int
+	// max duration of each bucket
+	Duration time.Duration
+	// timestamp of latest bucket
+	Bucket time.Time
+}
+
+func (cd *CircularDedup) Drop(pkt gopacket.Packet) (found bool) {
+	count := len(cd.Buckets)
+	if count == 0 {
+		cd.Buckets = make([]map[string]bool, 0, cd.MaxBuckets)
+		cd.Buckets[0] = make(map[string]bool)
+	}
+	h := HashMD5(pkt)
+	for _, bucket := range cd.Buckets {
+		if bucket[h] {
+			found = true
+		}
+	}
+	if !found {
+		cd.Buckets[len(cd.Buckets)-1][h] = true
+	}
+	// check if new bucket needs to be added
+	if time.Since(cd.Bucket) > cd.Duration {
+		cd.Buckets = append(cd.Buckets, map[string]bool{})
+		cd.Bucket = time.Now().Truncate(cd.Duration)
+		// drop last bucket if oversized
+		if count+1 > cd.MaxBuckets {
+			cd.Buckets = cd.Buckets[1:]
+		}
+	}
+	return found
+}
+
+func NewCircularDedup(max int, duration time.Duration) *CircularDedup {
+	cd := &CircularDedup{}
+	if max < 2 {
+		cd.MaxBuckets = 2
+	} else {
+		cd.MaxBuckets = max
+	}
+	if duration == 0 {
+		cd.Duration = 2 * time.Second
+	} else {
+		cd.Duration = duration
+	}
+	cd.Buckets = make([]map[string]bool, 1, max)
+	cd.Buckets[0] = make(map[string]bool)
+	cd.Bucket = time.Now().Truncate(cd.Duration)
+	return cd
 }
