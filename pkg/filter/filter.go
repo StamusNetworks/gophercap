@@ -23,6 +23,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/google/gopacket"
@@ -179,4 +181,17 @@ type Task struct {
 
 	Filter      Matcher
 	Description string
+}
+
+func ExtractBaseName(filename string) string {
+	// only the base file name without path
+	filename = filepath.Base(filename)
+	// trim suffix because compressed filename might leave .gz
+	// leading to filename.pcap.gz.gz when writing to compressed handle
+	filename = strings.TrimSuffix(filename, filepath.Ext(filename))
+	// check if filename still contains a extention, strip recursively until only base remains
+	if strings.Contains(filename, ".") {
+		return ExtractBaseName(filename)
+	}
+	return filename
 }

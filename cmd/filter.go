@@ -106,7 +106,7 @@ var filterCmd = &cobra.Command{
 						}
 						logrus.WithFields(logrus.Fields{
 							"input":  task.Input,
-							"output": task.Output,
+							"output": filepath.Dir(task.Output),
 							"desc":   task.Description,
 						}).Info("Filtering file")
 						result, err := filter.ReadAndFilter(&filter.Config{
@@ -156,7 +156,7 @@ var filterCmd = &cobra.Command{
 			logrus.Fatalf("PCAP list gen: %s", err)
 		}
 
-		for _, fn := range files {
+		for _, inFile := range files {
 			for name, matcher := range filters {
 				outDir := filepath.Join(output, name)
 				stat, err := os.Stat(outDir)
@@ -168,13 +168,17 @@ var filterCmd = &cobra.Command{
 					logrus.Fatalf("Output path %s exists and is not a directory", output)
 				}
 
+				outFile := filter.ExtractBaseName(inFile) + ".pcap"
+				outFile = filepath.Join(outDir, outFile)
+
 				logrus.WithFields(logrus.Fields{
 					"filter": name,
-					"path":   fn,
+					"path":   outFile,
 				}).Info("feeding file to matcher")
+
 				tasks <- filter.Task{
-					Input:       fn,
-					Output:      filepath.Join(outDir, filepath.Base(fn)),
+					Input:       inFile,
+					Output:      outFile,
 					Filter:      matcher,
 					Description: name,
 				}
