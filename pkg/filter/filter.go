@@ -27,6 +27,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/StamusNetworks/gophercap/pkg/dedup"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/pcapgo"
 )
@@ -55,17 +56,20 @@ type Config struct {
 	StatFunc func(map[string]any)
 
 	Ctx context.Context
+
+	Dedup dedup.Dedupper
 }
 
 type FilterResult struct {
-	Count       int
-	Matched     int
-	Errors      int
-	DecapErrors int
-	Skipped     int
-	Start       time.Time
-	Took        time.Duration
-	Rate        string
+	Count        int
+	Matched      int
+	Errors       int
+	DecapErrors  int
+	Skipped      int
+	Start        time.Time
+	Took         time.Duration
+	Rate         string
+	Deduplicated int
 }
 
 func (fr FilterResult) Map() map[string]any {
@@ -78,6 +82,7 @@ func (fr FilterResult) Map() map[string]any {
 		"start":        fr.Start,
 		"took":         fr.Took,
 		"rate":         fr.Rate,
+		"dedup":        fr.Deduplicated,
 	}
 }
 
@@ -160,6 +165,12 @@ loop:
 			pkt, err = DecapGREandERSPAN(pkt, c.DecapMaxDepth)
 			if err != nil {
 				res.DecapErrors++
+				continue loop
+			}
+		}
+		if c.Dedup != nil {
+			if c.Dedup.Drop(pkt) {
+				res.Deduplicated++
 				continue loop
 			}
 		}

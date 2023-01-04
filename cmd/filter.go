@@ -22,7 +22,9 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"time"
 
+	"github.com/StamusNetworks/gophercap/pkg/dedup"
 	"github.com/StamusNetworks/gophercap/pkg/filter"
 	"github.com/StamusNetworks/gophercap/pkg/replay"
 	"golang.org/x/sync/errgroup"
@@ -122,6 +124,12 @@ var filterCmd = &cobra.Command{
 								logrus.WithField("worker", id).WithFields(fr).Debug("filter report")
 							},
 							Ctx: ctx,
+							Dedup: func() dedup.Dedupper {
+								if viper.GetBool("filter.dedup") {
+									return dedup.NewCircularDedup(3, 2*time.Second)
+								}
+								return nil
+							}(),
 						})
 						if err != nil {
 							switch err.(type) {
@@ -220,6 +228,9 @@ func init() {
 
 	filterCmd.PersistentFlags().Bool("compress", false, `Write output packets directly to gzip stream.`)
 	viper.BindPFlag("filter.compress", filterCmd.PersistentFlags().Lookup("compress"))
+
+	filterCmd.PersistentFlags().Bool("dedup", false, `Apply best-effort software dedup.`)
+	viper.BindPFlag("filter.dedup", filterCmd.PersistentFlags().Lookup("dedup"))
 
 	filterCmd.PersistentFlags().String("maxmind-asn", "", `Path to maxmind ASN database. Only needed if ASN filter is used.`)
 	viper.BindPFlag("filter.maxmind.asn", filterCmd.PersistentFlags().Lookup("maxmind-asn"))
