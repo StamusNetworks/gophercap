@@ -22,10 +22,10 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
-	"sync"
 
 	"github.com/StamusNetworks/gophercap/pkg/filter"
 	"github.com/StamusNetworks/gophercap/pkg/replay"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -83,16 +83,13 @@ var filterCmd = &cobra.Command{
 		}
 
 		tasks := make(chan filter.Task, workers)
-		stoppers := make([]context.CancelFunc, workers)
 
-		var wg sync.WaitGroup
+		ctx, cancel := context.WithCancel(context.Background())
+		pool, ctx := errgroup.WithContext(ctx)
 		for i := 0; i < workers; i++ {
-			wg.Add(1)
-			ctx, stop := context.WithCancel(context.Background())
-			stoppers[i] = stop
-			go func(id int, ctx context.Context) {
+			id := i
+			pool.Go(func() error {
 				logrus.Infof("Worker %d started", id)
-				defer wg.Done()
 				defer logrus.Infof("Worker %d done", id)
 			loop:
 				for {
@@ -138,7 +135,8 @@ var filterCmd = &cobra.Command{
 						logrus.Infof("DONE: %+v", result)
 					}
 				}
-			}(i, ctx)
+				return nil
+			})
 		}
 
 		chSIG := make(chan os.Signal, 1)
@@ -146,10 +144,7 @@ var filterCmd = &cobra.Command{
 
 		go func(ctx context.Context) {
 			<-chSIG
-			for i, fn := range stoppers {
-				logrus.WithField("worker", i).Debug("calling stop")
-				fn()
-			}
+			cancel()
 		}(context.TODO())
 
 		files, err := replay.FindPcapFiles(input, viper.GetString("filter.suffix"))
@@ -157,7 +152,9 @@ var filterCmd = &cobra.Command{
 			logrus.Fatalf("PCAP list gen: %s", err)
 		}
 
+	outer:
 		for _, inFile := range files {
+		inner:
 			for name, matcher := range filters {
 				outDir := filepath.Join(output, name)
 				stat, err := os.Stat(outDir)
@@ -177,17 +174,23 @@ var filterCmd = &cobra.Command{
 					"path":   outFile,
 				}).Info("feeding file to matcher")
 
-				tasks <- filter.Task{
+				select {
+				case tasks <- filter.Task{
 					Input:       inFile,
 					Output:      outFile,
 					Filter:      matcher,
 					Description: name,
+				}:
+				case <-ctx.Done():
+					break outer
+					break inner
 				}
 			}
 		}
 		close(tasks)
-
-		wg.Wait()
+		if err := pool.Wait(); err != nil {
+			logrus.Fatal(err)
+		}
 	},
 }
 
