@@ -11,9 +11,8 @@ import (
 
 // HashMD5 is inspired by packet deduplication in Arkime
 // https://github.com/arkime/arkime/blob/main/capture/dedup.c#L57
-func HashMD5(pkt gopacket.Packet) string {
+func HashMD5(pkt gopacket.Packet) []byte {
 	h := md5.New()
-loop:
 	for _, layer := range pkt.Layers() {
 		switch layer.LayerType() {
 		case layers.LayerTypeIPv4:
@@ -30,11 +29,12 @@ loop:
 			h.Write(data[8:])
 		case layers.LayerTypeTCP, layers.LayerTypeUDP:
 			h.Write(layer.LayerContents())
-			// TCP / UDP layer is the innermost we want to hash
-			break loop
+			// we only want TCP or UDP packets to be deduplicated
+			// hashing every packet could cause problems with ICMP or more obscure protocols
+			return h.Sum(nil)
 		}
 	}
-	return hex.EncodeToString(h.Sum(nil))
+	return nil
 }
 
 // Dedupper is a subsystem that accepts a gopacket type and reports if it has been already seen
@@ -57,11 +57,15 @@ func (d *TrivialDedup) Drop(pkt gopacket.Packet) (found bool) {
 		d.Set = make(map[string]bool)
 	}
 	h := HashMD5(pkt)
-	if d.Set[h] {
+	if h == nil {
+		return false
+	}
+	key := hex.EncodeToString(h)
+	if d.Set[key] {
 		found = true
 		d.Hits++
 	}
-	d.Set[h] = true
+	d.Set[key] = true
 	return found
 }
 
@@ -87,13 +91,17 @@ func (cd *CircularDedup) Drop(pkt gopacket.Packet) (found bool) {
 		cd.Buckets[0] = make(map[string]bool)
 	}
 	h := HashMD5(pkt)
+	if h == nil {
+		return false
+	}
+	key := hex.EncodeToString(h)
 	for _, bucket := range cd.Buckets {
-		if bucket[h] {
+		if bucket[key] {
 			found = true
 		}
 	}
 	if !found {
-		cd.Buckets[len(cd.Buckets)-1][h] = true
+		cd.Buckets[len(cd.Buckets)-1][key] = true
 	}
 	// check if new bucket needs to be added
 	if time.Since(cd.Bucket) > cd.Duration {
