@@ -70,6 +70,7 @@ type FilterResult struct {
 	Took         time.Duration
 	Rate         string
 	Deduplicated int
+	DedupRatio   float64
 }
 
 func (fr FilterResult) Map() map[string]any {
@@ -83,6 +84,7 @@ func (fr FilterResult) Map() map[string]any {
 		"took":         fr.Took,
 		"rate":         fr.Rate,
 		"dedup":        fr.Deduplicated,
+		"dedup_ratio":  fr.DedupRatio,
 	}
 }
 
@@ -174,6 +176,7 @@ loop:
 		if c.Dedup != nil {
 			if c.Dedup.Drop(pkt) {
 				res.Deduplicated++
+				res.DedupRatio = (float64(res.Deduplicated) / float64(res.Count)) * 100
 				continue loop
 			}
 		}
