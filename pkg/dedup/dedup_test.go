@@ -1,6 +1,7 @@
 package dedup
 
 import (
+	"bytes"
 	"fmt"
 	"net"
 	"testing"
@@ -99,7 +100,7 @@ func TestHashV4(t *testing.T) {
 		}),
 		firstLayer,
 		opts))
-	if hashOrig != hashIdentical {
+	if !bytes.Equal(hashOrig, hashIdentical) {
 		t.Fatal("TTL and checksum should not affect IPv4 packet results")
 	}
 	hashDiffIP := HashMD5(gopacket.NewPacket(
@@ -117,7 +118,7 @@ func TestHashV4(t *testing.T) {
 		}),
 		firstLayer,
 		opts))
-	if hashOrig == hashDiffIP {
+	if bytes.Equal(hashOrig, hashDiffIP) {
 		fmt.Println(hashOrig)
 		fmt.Println(hashDiffIP)
 		t.Fatal("dest IP change should change hash result")
