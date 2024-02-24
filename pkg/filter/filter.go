@@ -181,6 +181,7 @@ loop:
 			}
 		}
 		ci.CaptureLength = len(pkt.Data())
+		ci.Length = len(pkt.Data())
 		pkt.Metadata().CaptureInfo = ci
 		if c.Filter.Match(pkt) {
 			if err := w.WritePacket(pkt.Metadata().CaptureInfo, pkt.Data()); err != nil {
