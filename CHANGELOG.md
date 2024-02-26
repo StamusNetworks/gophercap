@@ -1,3 +1,10 @@
+# 0.3.2
+
+## Release highlights
+
+* dependency updates and go 1.21 build
+* filter: fix mismatch pkt lenght and capture lenght after decap
+
 # 0.3.1
 
 ## Release highlights
