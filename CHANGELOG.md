@@ -1,3 +1,12 @@
+# 0.3.1
+
+## Release highlights
+
+* ci: pipeline improvements
+* mod: dependency updates
+* filter: usability improvements and optimizations
+* filter: support for packet deduplication
+
 # 0.3.0
 
 ## Release highlights
