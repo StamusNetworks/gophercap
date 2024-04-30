@@ -33,6 +33,7 @@ type FilterKind int
 const (
 	FilterKindUndefined FilterKind = iota
 	FilterKindSubnet
+	FilterKindEther
 	FilterKindPort
 	FilterKindASN
 	FilterKindRaw
@@ -42,6 +43,8 @@ func (k FilterKind) String() string {
 	switch k {
 	case FilterKindSubnet:
 		return "subnet"
+	case FilterKindEther:
+		return "ether"
 	case FilterKindPort:
 		return "port"
 	case FilterKindASN:
@@ -55,6 +58,7 @@ func (k FilterKind) String() string {
 
 var FilterKinds = []string{
 	FilterKindSubnet.String(),
+	FilterKindEther.String(),
 	FilterKindPort.String(),
 	FilterKindASN.String(),
 	FilterKindRaw.String(),
@@ -64,6 +68,8 @@ func NewFilterKind(raw string) FilterKind {
 	switch raw {
 	case FilterKindSubnet.String():
 		return FilterKindSubnet
+	case FilterKindEther.String():
+		return FilterKindEther
 	case FilterKindPort.String():
 		return FilterKindPort
 	case FilterKindASN.String():
@@ -111,6 +117,12 @@ func NewCombinedMatcher(c MatcherConfig) (*CombinedMatcher, error) {
 		switch NewFilterKind(condition.Kind) {
 		case FilterKindSubnet:
 			sm, err := NewConditionalSubnet(condition.Match)
+			if err != nil {
+				return nil, err
+			}
+			m = sm
+		case FilterKindEther:
+			sm, err := NewConditionEther(condition.Match)
 			if err != nil {
 				return nil, err
 			}
@@ -194,6 +206,28 @@ func (cs ConditionSubnet) match(ip net.IP) bool {
 		}
 	}
 	return false
+}
+
+type ConditionEther map[string]bool
+
+func (cs ConditionEther) Match(pkt gopacket.Packet) bool {
+	fmt.Println(pkt.LinkLayer().LinkFlow().Src().String())
+	if n := pkt.LinkLayer(); n != nil {
+		return cs[n.LinkFlow().Src().String()] || cs[n.LinkFlow().Dst().String()]
+	}
+	return false
+}
+
+func NewConditionEther(e []string) (ConditionEther, error) {
+	ce := make(ConditionEther)
+	for _, mac := range e {
+		_, err := net.ParseMAC(mac)
+		if err != nil {
+			return ce, fmt.Errorf("invalid MAC %s", mac)
+		}
+		ce[mac] = true
+	}
+	return ce, nil
 }
 
 func NewPortMatcher(p []string) (ConditionEndpoint, error) {
